@@ -275,7 +275,7 @@ with gr.Blocks() as demo:
                     cfg_text_scale_t2i = gr.Slider(minimum=1.0, maximum=8.0, value=4.0, step=0.1, interactive=True, label="CFG Text Scale", info="Controls how strongly the model follows the text prompt (4.0-8.0)")
                     cfg_interval_t2i = gr.Slider(minimum=0.0, maximum=1.0, value=0.4, step=0.1, label="CFG Interval", info="Start of CFG application interval (end is fixed at 1.0)")
                 with gr.Row(): 
-                    cfg_renorm_type_t2i = gr.Dropdown(choices=[("global","global"), ("local","local"), ("text_channel","text_channel")], value="global", label="CFG Renorm Type", info="If the genrated image is blurry, use 'global'")
+                    cfg_renorm_type_t2i = gr.Dropdown(choices=[("global","global"), ("local","local"), ("text_channel","text_channel")], value="global", label="CFG Renorm Type", info="If the generated image is blurry, use 'global'")
                     cfg_renorm_min_t2i = gr.Slider(minimum=0.0, maximum=1.0, value=0.0, step=0.1, interactive=True, label="CFG Renorm Min", info="1.0 disables CFG-Renorm")
                 with gr.Row(): 
                     num_timesteps_t2i = gr.Slider(minimum=10, maximum=100, value=50, step=5, interactive=True, label="Timesteps", info="Total denoising steps")
