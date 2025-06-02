@@ -114,13 +114,13 @@ Run the modified Gradio WebUI script:
 
 ```bash
 # For 32GB+ VRAM GPU or multi GPUs. Saves output to ./output/
-python app_rework.py
+python app.py
 
 # To specify a different output directory
-python app_rework.py --output_dir /path/to/your/output
+python app.py --output_dir /path/to/your/output
 
 # For 12~32GB VRAM GPU/NF4 quantization and Chinese UI
-python app_rework.py --mode 2 --zh
+python app.py --mode 2 --zh
 
 
 ❤️ Based on the Original BAGEL Project
