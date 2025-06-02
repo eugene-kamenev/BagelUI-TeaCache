@@ -123,7 +123,7 @@ python app.py --output_dir /path/to/your/output
 python app.py --mode 2 --zh
 ```
 
-❤️ Based on the Original BAGEL Project
+## ❤️ Based on the Original BAGEL Project
 This work is based on the amazing BAGEL project. Please refer to the original repository for core model details, training guidelines, and benchmarks.
 
 <p align="center"> <a href="https://bagel-ai.org/">Website</a> | <a href="https://arxiv.org/abs/2505.14683">Paper</a> | <a href="https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT">Model on Hugging Face</a> | <a href="https://demo.bagel-ai.org/">Official Demo</a> | <a href="https://huggingface.co/spaces/ByteDance-Seed/BAGEL">Official Hugging Face Space</a> | <a href="https://discord.gg/Z836xxzy">Discord</a> | <a href="mailto:bagel@bytedance.com">Email</a> </p>
