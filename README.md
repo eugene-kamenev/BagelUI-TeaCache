@@ -76,7 +76,7 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
     -   Provides a downloadable ZIP file containing all processed images and their generated `.txt` files.
 
 ## ⚙️ Local Installation
-(A Google-Colab Notebook 'BagelUI-colab.ipynb' for easy cloud-use is also provided)
+(A Jupyter Notebook 'BagelUI-colab.ipynb' for easy cloud-use is also provided)
 1.  **Clone this fork:**
     ```bash
     git clone https://github.com/dasjoms/BagelUI.git
