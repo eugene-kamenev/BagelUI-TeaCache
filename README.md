@@ -75,12 +75,12 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
     -   Processes each image file in the batch sequentially, saving the understanding result for each into a corresponding `.txt` file.
     -   Provides a downloadable ZIP file containing all processed images and their generated `.txt` files.
 
-## ⚙️ Installation
+## ⚙️ Local Installation (A Google-Colab Notebook 'BagelUI-colab.ipynb' for easy use is also provided)
 
 1.  **Clone this fork:**
     ```bash
     git clone https://github.com/dasjoms/BagelUI.git
-    cd BAGEL
+    cd BagelUI
     ```
 
 2.  **Set up environment:**
