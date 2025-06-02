@@ -67,7 +67,7 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
     -   A dedicated **X/Y Plot** menu in the **Text to Image** and **Image Edit** tabs.
     -   Allows selecting up to two hyperparameters (X and Y axes) and providing comma-separated values for each.
     -   Generates an image for every combination of the selected parameter values.
-    -   Includes **Prompt S/R (Search/Replace)** parameter for axes, akin to the same feature in Automatic1111's Stable Diffusion webui. Search for a string in the prompt and replace it with something else (separated by commas)
+    -   Includes **Prompt S/R (Search/Replace)** parameter for axes, akin to the same feature in Automatic1111's Stable Diffusion webui. Search for a string in the prompt and replace it with something else (separated by commas).
     -   Assembles the generated images into a single grid with axis labels indicating the parameter values used for each row/column.
 -   **Batch Image Understanding/Captioning:**
     -   Adds an **Input Mode**  button to the **Image Understanding** tab for switching between single image and batch processing.
