@@ -50,7 +50,7 @@
 
 # BAGEL Gradio UI Fork with Extended Features
 
-This is a fork of the official BAGEL project's Gradio WebUI, incorporating several quality-of-life improvements and advanced features for enhanced multimodal interaction.
+This is a fork of the official BAGEL project's Gradio WebUI, incorporating several quality-of-life improvements and features.
 
 Based on the original work by [Chaorui Deng* et al.](https://arxiv.org/abs/2505.14683)
 
