@@ -270,7 +270,7 @@ with gr.Blocks() as demo:
                 with gr.Row(): 
                     seed_t2i = gr.Slider(minimum=0, maximum=1000000, value=0, step=1, label="Seed", info="0 for random seed, positive for reproducible results")
                     image_ratio_t2i = gr.Dropdown(choices=[("1:1","1:1"), ("4:3","4:3"), ("3:4","3:4"), ("16:9","16:9"), ("9:16","9:16")], value="1:1", label="Image Ratio", info="The longer size is fixed to 1024")
-                    batch_size_t2i = gr.Slider(minimum=1, maximum=8, value=1, step=1, interactive=True, label="Batch Size", info="Number of images to generate sequentially.")
+                    batch_size_t2i = gr.Slider(minimum=1, maximum=32, value=1, step=1, interactive=True, label="Batch Size", info="Number of images to generate sequentially.")
                 with gr.Row(): 
                     cfg_text_scale_t2i = gr.Slider(minimum=1.0, maximum=8.0, value=4.0, step=0.1, interactive=True, label="CFG Text Scale", info="Controls how strongly the model follows the text prompt (4.0-8.0)")
                     cfg_interval_t2i = gr.Slider(minimum=0.0, maximum=1.0, value=0.4, step=0.1, label="CFG Interval", info="Start of CFG application interval (end is fixed at 1.0)")
@@ -315,7 +315,7 @@ with gr.Blocks() as demo:
                 with gr.Row(): 
                     edit_seed = gr.Slider(minimum=0, maximum=1000000, value=0, step=1, interactive=True, label="Seed", info="0 for random seed, positive for reproducible results")
                     edit_cfg_text_scale = gr.Slider(minimum=1.0, maximum=8.0, value=4.0, step=0.1, interactive=True, label="CFG Text Scale", info="Controls how strongly the model follows the text prompt")
-                    edit_batch_size = gr.Slider(minimum=1, maximum=4, value=1, step=1, interactive=True, label="Batch Size", info="Number of images to generate sequentially.")
+                    edit_batch_size = gr.Slider(minimum=1, maximum=32, value=1, step=1, interactive=True, label="Batch Size", info="Number of images to generate sequentially.")
                 with gr.Row(): 
                     edit_cfg_img_scale = gr.Slider(minimum=1.0, maximum=4.0, value=2.0, step=0.1, interactive=True, label="CFG Image Scale", info="Controls how much the model preserves input image details")
                     edit_cfg_interval = gr.Slider(minimum=0.0, maximum=1.0, value=0.0, step=0.1, interactive=True, label="CFG Interval", info="Start of CFG application interval (end is fixed at 1.0)")
