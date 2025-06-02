@@ -665,14 +665,8 @@ with gr.Blocks() as demo:
                                 for f_in_zip in files_in_zip:
                                     if f_in_zip.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                                         extracted_file_path = os.path.join(root, f_in_zip)
-                                        # To avoid name collisions IF multiple zips have same internal names AND are extracted to same `temp_extraction_dir` flatly.
-                                        # Better to handle this by ensuring unique names or processing zip contents immediately.
-                                        # For now, let's just use the path as is, assuming os.walk gives full paths.
                                         temp_extracted_files.append(extracted_file_path)
                             image_paths_to_process.extend(temp_extracted_files) # Add all found images
-                            # Clear temp_extraction_dir for the next zip IF multiple zips are uploaded and extracted sequentially to the same dir.
-                            # Or, better: create a unique subdir in temp_extraction_dir for each zip.
-                            # For simplicity now, assuming single zip or non-colliding names if multiple zips.
                         except zipfile.BadZipFile: log_messages.append(f"  Error: '{original_filename}' is invalid ZIP."); print(f"  Error: '{original_filename}' is invalid ZIP.")
                         except Exception as e_zip: log_messages.append(f"  Error processing ZIP '{original_filename}': {e_zip}"); print(f"  Error processing ZIP '{original_filename}': {e_zip}")
                     elif original_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
