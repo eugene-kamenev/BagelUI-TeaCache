@@ -126,13 +126,19 @@ python app.py --mode 2 --zh
 ## ❤️ Based on the Original BAGEL Project
 This work is based on the amazing BAGEL project. Please refer to the original repository for core model details, training guidelines, and benchmarks.
 
-<p align="center"> <a href="https://bagel-ai.org/">Website</a> | <a href="https://arxiv.org/abs/2505.14683">Paper</a> | <a href="https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT">Model on Hugging Face</a> | <a href="https://demo.bagel-ai.org/">Official Demo</a> | <a href="https://huggingface.co/spaces/ByteDance-Seed/BAGEL">Official Hugging Face Space</a> | <a href="https://discord.gg/Z836xxzy">Discord</a> | <a href="mailto:bagel@bytedance.com">Email</a> </p>
-✍️ Citation
+## ✍️ Citation
+
+```bibtex
 @article{deng2025bagel,
- author = {Deng, Chaorui and Zhu, Deyao and Li, Kunchang and Gou, Chenhui and Li, Feng and Wang, Zeyu and Zhong, Shu and Yu, Weihao and Nie, Xiaonan and Song, Ziang and Shi, Guang and Fan, Haoqi},
- title = {Emerging Properties in Unified Multimodal Pretraining},
- journal = {arXiv preprint arXiv:2505.14683},
- year = {2025}
+  title   = {Emerging Properties in Unified Multimodal Pretraining},
+  author  = {Deng, Chaorui and Zhu, Deyao and Li, Kunchang and Gou, Chenhui and Li, Feng and Wang, Zeyu and Zhong, Shu and Yu, Weihao and Nie, Xiaonan and Song, Ziang and Shi, Guang and Fan, Haoqi},
+  journal = {arXiv preprint arXiv:2505.14683},
+  year    = {2025}
 }
-📜 License
-This project is licensed under the Apache 2.0 License, inherited from the original BAGEL project.
+```
+
+
+## 📜 License
+BAGEL is licensed under the Apache 2.0.
+
+<p align="center"> <a href="https://bagel-ai.org/">Website</a> | <a href="https://arxiv.org/abs/2505.14683">Paper</a> | <a href="https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT">Model on Hugging Face</a> | <a href="https://demo.bagel-ai.org/">Official Demo</a> | <a href="https://huggingface.co/spaces/ByteDance-Seed/BAGEL">Official Hugging Face Space</a> | <a href="https://discord.gg/Z836xxzy">Discord</a> | <a href="mailto:bagel@bytedance.com">Email</a> </p>
