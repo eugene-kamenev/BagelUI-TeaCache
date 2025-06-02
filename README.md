@@ -121,7 +121,7 @@ python app.py --output_dir /path/to/your/output
 
 # For 12~32GB VRAM GPU/NF4 quantization and Chinese UI
 python app.py --mode 2 --zh
-
+```
 
 ❤️ Based on the Original BAGEL Project
 This work is based on the amazing BAGEL project. Please refer to the original repository for core model details, training guidelines, and benchmarks.
