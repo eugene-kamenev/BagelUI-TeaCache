@@ -79,19 +79,19 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
 
 1.  **Clone this fork:**
     ```bash
-    git clone <your_fork_url>
+    git clone https://github.com/dasjoms/BagelUI.git
     cd BAGEL
     ```
-    *(Replace `<your_fork_url>` with the actual URL of your GitHub repository fork)*
-2.  **Set up environment:** (Same as original)
+
+2.  **Set up environment:**
     ```bash
     conda create -n bagel python=3.10 -y
     conda activate bagel
     pip install -r requirements.txt
     pip install flash_attn==2.5.8 --no-build-isolation
     ```
-    *(The added features use standard Python libraries already likely present, or included in the original requirements.)*
-3.  **Download pretrained checkpoint:** (Same as original)
+    
+3.  **Download pretrained checkpoint:**
     ```python
     from huggingface_hub import snapshot_download
 
@@ -119,11 +119,9 @@ python app_rework.py
 # To specify a different output directory
 python app_rework.py --output_dir /path/to/your/output
 
-# For NF4 quantization and Chinese UI
+# For 12~32GB VRAM GPU/NF4 quantization and Chinese UI
 python app_rework.py --mode 2 --zh
-Open your browser to the address shown in the console (default: http://127.0.0.1:7860).
 
-Explore the Text-to-Image, Image Edit, and Image Understanding tabs to access the new features.
 
 ❤️ Based on the Original BAGEL Project
 This work is based on the amazing BAGEL project. Please refer to the original repository for core model details, training guidelines, and benchmarks.
