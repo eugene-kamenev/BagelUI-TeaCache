@@ -60,7 +60,7 @@ Based on the original work by [Chaorui Deng* et al.](https://arxiv.org/abs/2505.
 This update adds support for dfloat11 compressed BAGEL models and enhances model management, flexibility and inference speed within the BagelUI:
 
 -   **DFloat11 Compressed Model Support:**
-    -   Integrated full support for loading and running DFloat11 compressed version of BAGEL model. Install 'dfloat11' python package if you updated the repo and don't want to reinstall requirements.txt
+    -   Integrated full support for loading and running DFloat11 compressed version of BAGEL model.
 -   **Dynamic Model Loading & Switching:**
     -   Introduced new **⚙️ Models** tab, allowing dynamic loading and switching between different BAGEL model checkpoints and quantizations.
 -   **Inference Optimizations:**
