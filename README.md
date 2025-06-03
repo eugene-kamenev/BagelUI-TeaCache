@@ -102,11 +102,16 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
 
 2.  **Set up environment:**
     ```bash
-    conda create -n bagel python=3.10 -y
+    conda create -n bagel python=3.11.12 -y
     conda activate bagel
     pip install -r requirements.txt
     pip install flash_attn==2.5.8 --no-build-isolation
     ```
+    2.5 **Manually install dfloat11 package**
+    
+     ```bash
+       pip install dfloat11
+       ```
     
 3.  **Download pretrained checkpoint and/or DFloat11 compressed model:**
 
