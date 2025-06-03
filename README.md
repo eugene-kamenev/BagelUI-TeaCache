@@ -54,6 +54,21 @@ This is a fork of the official BAGEL project's Gradio WebUI, incorporating sever
 
 Based on the original work by [Chaorui Deng* et al.](https://arxiv.org/abs/2505.14683)
 
+
+## Latest Update (June 03, 2025)
+
+This update adds support for dfloat11 compressed BAGEL models and enhances model management, flexibility and inference speed within the BagelUI:
+
+-   **DFloat11 Compressed Model Support:**
+    -   Integrated full support for loading and running DFloat11 compressed version of BAGEL model.
+-   **Dynamic Model Loading & Switching:**
+    -   Introduced new **⚙️ Models** tab, allowing dynamic loading and switching between different BAGEL model checkpoints and quantizations.
+-   **Inference Optimizations:**
+    -   Made modifications to reduce memory overhead and speed up operations by disabling gradient tracking.
+
+
+Special thanks to this repo for the original implementation of the DFloat11 model: https://github.com/LeanModels/Bagel-DFloat11/
+ 
 ## ✨ Added Features
 
 This fork builds upon the original BAGEL Gradio UI by adding the following functionalities:
@@ -91,8 +106,11 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
     pip install flash_attn==2.5.8 --no-build-isolation
     ```
     
-3.  **Download pretrained checkpoint:**
+3.  **Download pretrained checkpoint and/or DFloat11 compressed model:**
+
     ```python
+    ### Regular BAGEL-7B Model
+    
     from huggingface_hub import snapshot_download
 
     save_dir = "models/BAGEL-7B-MoT"
@@ -107,6 +125,26 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
      allow_patterns=["*.json", "*.safetensors", "*.bin", "*.py", "*.md", "*.txt"],
     )
     ```
+    ```python
+    ### DFloat11 Model - Allows for 24GB VRAM Single GPU inference without quality loss
+    
+    from huggingface_hub import snapshot_download
+
+    save_dir = "models/BAGEL-7B-MoT-DF11"
+    repo_id = "DFloat11/BAGEL-7B-MoT-DF11"
+    cache_dir = save_dir + "/cache"
+
+    snapshot_download(cache_dir=cache_dir,
+     local_dir=save_dir,
+     repo_id=repo_id,
+     local_dir_use_symlinks=False,
+     resume_download=True,
+     allow_patterns=["*.json", "*.safetensors", "*.bin", "*.py", "*.md", "*.txt", "*.model", "vae/*"],
+    )
+    ```
+
+
+
 
 ## ▶️ Usage
 
@@ -121,6 +159,8 @@ python app.py --output_dir /path/to/your/output
 
 # For 12~32GB VRAM GPU/NF4 quantization and Chinese UI
 python app.py --mode 2 --zh
+
+# Different Requirements apply for using the DFloat11 Model
 ```
 
 ## ❤️ Based on the Original BAGEL Project
