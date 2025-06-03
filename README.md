@@ -67,7 +67,9 @@ This update adds support for dfloat11 compressed BAGEL models and enhances model
     -   Made modifications to reduce memory overhead and speed up operations by disabling gradient tracking.
 
 
-Special thanks to this repo for the original implementation of the DFloat11 model: https://github.com/LeanModels/Bagel-DFloat11/
+Special thanks to this repo for the original inference implementation of the DFloat11 model: https://github.com/LeanModels/Bagel-DFloat11/
+
+The BagelUI-Colab.ipynb Jupyter Notebook has also been updated.
  
 ## ✨ Added Features
 
@@ -91,7 +93,7 @@ This fork builds upon the original BAGEL Gradio UI by adding the following funct
     -   Provides a downloadable ZIP file containing all processed images and their generated `.txt` files.
 
 ## ⚙️ Local Installation
-(A Jupyter Notebook 'BagelUI-colab.ipynb' for easy cloud-use is also provided)
+(A Jupyter Notebook 'BagelUI-colab.ipynb' for easy cloud-use is also provided, L4 GPU is enough to run DFloat11)
 1.  **Clone this fork:**
     ```bash
     git clone https://github.com/dasjoms/BagelUI.git
