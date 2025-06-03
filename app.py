@@ -11,7 +11,7 @@ import tempfile
 import shutil 
 from PIL import UnidentifiedImageError
 import gc
-from accelerate import infer_auto_device_map, dispatch_model, init_empty_weights # Corrected: dispatch_model is directly from accelerate
+from accelerate import infer_auto_device_map, dispatch_model, init_empty_weights 
 from dfloat11 import DFloat11Model
 
 from data.data_utils import add_special_tokens, pil_img2rgb
@@ -31,8 +31,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--server_name", type=str, default="127.0.0.1")
 parser.add_argument("--server_port", type=int, default=7860)
 parser.add_argument("--share", action="store_true")
-parser.add_argument("--model_path", type=str, default="models/BAGEL-7B-MoT") # Default model path
-parser.add_argument("--mode", type=int, default=3, choices=[1, 2, 3, 4], help="1: bfloat16, 2: 4-bit quant, 3: 8-bit quant, 4: DFloat11") # Changed default mode to 3 (8-bit)
+parser.add_argument("--model_path", type=str, default="models/BAGEL-7B-MoT")
+parser.add_argument("--mode", type=int, default=2, choices=[1, 2, 3, 4], help="1: bfloat16, 2: 4-bit quant, 3: 8-bit quant, 4: DFloat11")
 parser.add_argument("--zh", action="store_true")
 parser.add_argument("--output_dir", type=str, default="output", help="Base directory to save generated images.")
 args = parser.parse_args()
@@ -46,10 +46,10 @@ model = None
 vae_model = None
 tokenizer = None
 new_token_ids = None
-inferencer = None # THIS IS THE CRUCIAL GLOBAL VARIABLE
-model_path_global = None # Stores the path of the currently loaded model directory
+inferencer = None 
+model_path_global = None 
 
-# Shared transform objects (can be initialized once as they are not model-dependent, only config-dependent)
+
 vae_transform = ImageTransform(1024, 512, 16)
 vit_transform = ImageTransform(980, 224, 14)
 
@@ -163,7 +163,7 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
         elif selected_mode_int == 1: 
             status_message += "Loading in bfloat16 mode...\n"
             local_model = load_checkpoint_and_dispatch(local_model, checkpoint=os.path.join(current_model_dir, "ema.safetensors"), device_map=device_map, offload_buffers=True, offload_folder="offload", dtype=torch.bfloat16, force_hooks=True).eval()
-            # --- OPTIMIZATION: torch.compile for bfloat16 ---
+
             try:
                 print("Attempting to compile bfloat16 model with torch.compile()...")
                 local_model = torch.compile(local_model, mode="reduce-overhead") 
@@ -172,7 +172,7 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
             except Exception as e_compile:
                 status_message += f"Warning: torch.compile() for bfloat16 failed: {e_compile}\n"
                 print(f"Warning: torch.compile() for bfloat16 failed: {e_compile}")
-            # --- END OPTIMIZATION ---
+
         
         elif selected_mode_int == 2: 
             status_message += "Loading in 4-bit quantization mode...\n"
@@ -224,10 +224,10 @@ def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=
     else: image_shapes = (1024,1024)
     inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type, image_shapes=image_shapes)
     
-    # --- OPTIMIZATION: torch.inference_mode() ---
+
     with torch.inference_mode():
         result = inferencer(text=prompt, think=show_thinking, **inference_hyper) 
-    # --- END OPTIMIZATION ---
+
     
     generated_image = result["image"]
     if save_to_dir and generated_image:
@@ -248,10 +248,10 @@ def edit_image(image: Image.Image, prompt: str, show_thinking=False, cfg_text_sc
     image_pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image; image_pil = pil_img2rgb(image_pil)
     inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_img_scale=cfg_img_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type)
     
-    # --- OPTIMIZATION: torch.inference_mode() ---
+
     with torch.inference_mode():
         result = inferencer(image=image_pil, text=prompt, think=show_thinking, **inference_hyper) 
-    # --- END OPTIMIZATION ---
+
 
     edited_image = result["image"]
     if save_to_dir and edited_image:
@@ -271,10 +271,10 @@ def _perform_image_understanding(pil_image: Image.Image, prompt: str, show_think
     set_seed(0)
     inference_hyper = dict(do_sample=do_sample, text_temperature=text_temperature, max_think_token_n=max_new_tokens)
     
-    # --- OPTIMIZATION: torch.inference_mode() ---
+
     with torch.inference_mode():
         result = inferencer(image=pil_image, text=prompt, think=show_thinking, understanding_output=True, **inference_hyper) 
-    # --- END OPTIMIZATION ---
+
     
     return result["text"]
 
@@ -356,8 +356,8 @@ def parse_xy_value_string(value_str, param_type, param_name=""):
     if param_name == "Prompt S/R":
         parts = [p.strip() for p in value_str.split(',')]
         if not parts: gr.Warning(f"Prompt S/R value string is empty."); return []
-        if len(parts) == 1: return [PROMPT_SR_ORIGINAL_PLACEHOLDER, parts[0]] # Just one part for the replacement value, original is default
-        return [PROMPT_SR_ORIGINAL_PLACEHOLDER] + parts[1:] # First part is search, rest are replacements
+        if len(parts) == 1: return [PROMPT_SR_ORIGINAL_PLACEHOLDER, parts[0]]
+        return [PROMPT_SR_ORIGINAL_PLACEHOLDER] + parts[1:] 
     values = []
     try:
         for item_str in value_str.split(','):
@@ -366,7 +366,7 @@ def parse_xy_value_string(value_str, param_type, param_name=""):
                 range_parts = item_str.split('-');
                 if len(range_parts) == 2:
                     start, end = param_type(range_parts[0]), param_type(range_parts[1])
-                    if start > end: start, end = end, start # Ensure start is less than or equal to end
+                    if start > end: start, end = end, start 
                     if param_type == int: values.extend(list(range(start, end + 1)))
                     else: values.extend(np.linspace(start, end, num=max(2, int(abs(end-start)/0.5) if abs(end-start)>0.1 else 5 )).tolist())
                     continue
@@ -386,7 +386,7 @@ def assemble_xy_plot_image(images_matrix_flat, x_param_name, x_values, y_param_n
     y_axis_active = y_param_name != NO_SELECTION_STR and y_values
     num_cols = len(x_values) if x_axis_active else 1
     num_rows = len(y_values) if y_axis_active else 1
-    label_font_size = 28; label_padding = 20 # Increased font and padding
+    label_font_size = 28; label_padding = 20 
     try: font = ImageFont.truetype("arial.ttf", label_font_size)
     except IOError: font = ImageFont.load_default(); label_font_size = font.getsize("M")[1] if hasattr(font, "getsize") else 15 
     x_label_height = label_font_size + label_padding if x_axis_active else 0; y_label_width = 0
@@ -428,9 +428,9 @@ def assemble_xy_plot_image(images_matrix_flat, x_param_name, x_values, y_param_n
                     draw.rectangle([(rect_x0, rect_y0), (rect_x1, rect_y1)], outline="red", fill="lightgray"); draw.text((rect_x0 + 5, rect_y0 + 5), "Error", fill="red", font=font)
     return grid_image
 
-# --- UI Callback Functions (Moved outside gr.Blocks) ---
+# --- UI Callback Functions ---
 def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed_main, image_ratio_main, batch_size_main, enable_xy, xy_x_param_name, xy_x_values_str, xy_y_param_name, xy_y_values_str):
-    global current_tab; current_tab = "t2i" # To log current tab for debugging purposes, not crucial for functionality
+    global current_tab; current_tab = "t2i" 
     xy_plot_run_save_dir = None 
 
     if not enable_xy:
@@ -438,7 +438,7 @@ def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_mai
         txt2img_save_dir = os.path.join(args.output_dir, "txt2img"); os.makedirs(txt2img_save_dir, exist_ok=True)
         for i in range(int(batch_size_main)):
             current_iteration_seed = base_seed + i if base_seed > 0 else random.randint(1, 2**32 -1)
-            # No longer pass inferencer_obj; text_to_image uses global
+
             image_result, thinking_result = text_to_image(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed=current_iteration_seed, image_ratio=image_ratio_main, save_to_dir=txt2img_save_dir, batch_index=i)
             if image_result: all_images.append(image_result)
             if thinking_result: all_thinking_texts.append(f"Batch {i+1} (Seed: {current_iteration_seed}) Thinking:\n{thinking_result}")
@@ -508,7 +508,7 @@ def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_mai
             current_cell_params["xy_plot_filename_prefix"] = cell_filename_prefix
 
             print(f"Generating T2I X/Y Plot: {cell_filename_prefix} with {', '.join(param_summary) if param_summary else 'base params'}, Seed: {current_cell_params['seed']}")
-            # No longer pass inferencer_obj to text_to_image
+
             img, _ = text_to_image(**current_cell_params)
             plot_images_flat.append(img)
             if not first_image_for_size and img: first_image_for_size = img
@@ -538,7 +538,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
         sub_prompts_from_llm, decomposition_llm_thinking_text = [user_main_prompt_main], ""; current_run_save_dir = ""
         if enable_breakdown_main:
             base_task_dir = os.path.join(args.output_dir, "task_breakdown"); current_run_save_dir = get_next_project_folder_path(base_task_dir)
-            # No longer pass inferencer_obj to decompose_task_with_llm
+
             sub_prompts_from_llm, decomposition_llm_thinking_text_raw = decompose_task_with_llm(user_main_prompt_main, image_input_pil.copy(), True, decompose_sample_main, decompose_temp_main, decompose_max_t_main, decompose_num_s_main)
             initial_decomposition_summary = f"[INFO] LLM Decomposed into {len(sub_prompts_from_llm)} steps:\n" + "\n".join([f" - {sp}" for sp in sub_prompts_from_llm])
             if sub_prompts_from_llm == [user_main_prompt_main] and "CRITICAL FAILURE" not in decomposition_llm_thinking_text_raw: decomposition_llm_thinking_text_raw = (decomposition_llm_thinking_text_raw or "") + "\n[INFO] Task decomposition might have failed..."
@@ -551,7 +551,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
             active_prompts_for_this_run = sub_prompts_from_llm if enable_breakdown_main else [user_main_prompt_main]
             for step_num, sub_prompt_text in enumerate(active_prompts_for_this_run):
                 thinking_for_this_batch_run.append(f"Processing Sub-step {step_num+1}/{len(active_prompts_for_this_run)}: '{sub_prompt_text}'"); print(f"Batch {batch_idx+1}, Seed {current_batch_item_seed}, Sub-step {step_num+1}: '{sub_prompt_text}'")
-                # No longer pass inferencer_obj to edit_image
+
                 edited_sub_step_image_pil, thinking_text_from_sub_step = edit_image(current_image_being_processed, sub_prompt_text, show_thinking_main, cfg_text_scale_main, cfg_img_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, edit_max_think_tokens_main, edit_do_sample_main, edit_temp_main, seed=current_batch_item_seed, save_to_dir=current_run_save_dir, batch_index=batch_idx, sub_step_idx=step_num)
                 if edited_sub_step_image_pil and isinstance(edited_sub_step_image_pil, Image.Image): current_image_being_processed = edited_sub_step_image_pil; thinking_for_this_batch_run.append(f" Sub-step {step_num+1} Thinking: {thinking_text_from_sub_step}") if show_thinking_main and thinking_text_from_sub_step else None
                 else: error_msg = f" Sub-step {step_num+1} FAILED. {edited_sub_step_image_pil if isinstance(edited_sub_step_image_pil, str ) else 'No valid image.'}"; thinking_for_this_batch_run.append(error_msg); print(error_msg); break
@@ -615,7 +615,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
             current_cell_params_e["xy_plot_filename_prefix"] = cell_filename_prefix_e
 
             print(f"Generating Edit X/Y Plot: {cell_filename_prefix_e} with {', '.join(param_summary_e) if param_summary_e else 'base params'}, Seed: {current_cell_params_e['seed']}")
-            # No longer pass inferencer_obj to edit_image
+
             img_e, _ = edit_image(**current_cell_params_e)
             plot_images_flat_edit.append(img_e)
             if not first_image_for_size_edit and img_e and isinstance(img_e, Image.Image): first_image_for_size_edit = img_e
@@ -637,7 +637,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
     else: return [], "Failed to assemble Edit X/Y plot image.", gr.update(visible=True)
 
 def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt, show_thinking, do_sample_u, text_temperature_u, max_new_tokens_u):
-    global inferencer # Access global inferencer
+    global inferencer 
     if inferencer is None:
         gr.Warning("No model loaded. Please load a model from the Models tab first.")
         yield "No model loaded. Please load a model from the Models tab first.", "", None; return
@@ -648,16 +648,16 @@ def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt
             try: single_img_pil = Image.fromarray(single_img_pil)
             except: gr.Warning("Invalid single image format."); yield "Invalid single image format.", "", None; return
         single_img_pil = pil_img2rgb(single_img_pil)
-        # No longer pass inferencer_obj to _perform_image_understanding
+
         result_text = _perform_image_understanding(single_img_pil, prompt, show_thinking, do_sample_u, text_temperature_u, max_new_tokens_u)
-        yield result_text, "", None # Single text output, empty log, no zip
+        yield result_text, "", None 
         return 
 
     elif input_mode == "Batch (Files/ZIP)":
         if not batch_file_objs: gr.Warning("Please upload files or a ZIP for batch processing."); yield "", "No files uploaded for batch processing.", None; return
         
         log_messages = ["Batch processing started..."]
-        yield "", "\n".join(log_messages), None # Initial log update
+        yield "", "\n".join(log_messages), None 
         processed_files_for_zip_paths = [] 
         temp_batch_dir = tempfile.mkdtemp(); temp_extraction_dir = os.path.join(temp_batch_dir, "extracted_from_zip")
         os.makedirs(temp_extraction_dir, exist_ok=True)
@@ -667,8 +667,8 @@ def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt
         processed_image_counter = 0
 
         for file_obj in batch_file_objs:
-            original_filename = os.path.basename(file_obj.name) # For user-facing original name
-            temp_file_path = file_obj.name # Actual path to Gradio's temp file
+            original_filename = os.path.basename(file_obj.name) 
+            temp_file_path = file_obj.name 
             
             log_messages.append(f"Inspecting: {original_filename}"); print(f"Inspecting: {original_filename}")
             yield "", "\n".join(log_messages), None
@@ -684,11 +684,11 @@ def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt
                             if f_in_zip.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                                 extracted_file_path = os.path.join(root, f_in_zip)
                                 temp_extracted_files.append(extracted_file_path)
-                    image_paths_to_process.extend(temp_extracted_files) # Add all found images
+                    image_paths_to_process.extend(temp_extracted_files) 
                 except zipfile.BadZipFile: log_messages.append(f" Error: '{original_filename}' is invalid ZIP."); print(f" Error: '{original_filename}' is invalid ZIP.")
                 except Exception as e_zip: log_messages.append(f" Error processing ZIP '{original_filename}': {e_zip}"); print(f" Error processing ZIP '{original_filename}': {e_zip}")
             elif original_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                image_paths_to_process.append(temp_file_path) # Use Gradio's temp path directly
+                image_paths_to_process.append(temp_file_path) 
             
         if not image_paths_to_process:
             shutil.rmtree(temp_batch_dir); log_messages.append("No valid image files found in uploads or ZIPs."); yield "", "\n".join(log_messages), None; return
@@ -702,19 +702,17 @@ def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt
             try:                     
                 img_pil = Image.open(img_path); img_pil_rgb = pil_img2rgb(img_pil)
                 
-                # Determine a unique base name for output files
+
                 img_filename_for_output = os.path.basename(img_path)
                 img_filename_base, img_ext = os.path.splitext(img_filename_for_output)
 
                 log_messages.append(f"\n[{idx+1}/{total_images}] Processing: {img_filename_for_output}"); print(f"Batch Understanding [{idx+1}/{total_images}]: {img_filename_for_output}")
                 yield "", "\n".join(log_messages), None
                 
-                # Copy original image to the build directory for zipping
+
                 img_copy_for_zip_path = os.path.join(output_files_build_dir, img_filename_for_output)
-                # If img_path is already in temp_extraction_dir (from a zip), copy. If it's a Gradio temp file, copy.
                 shutil.copy2(img_path, img_copy_for_zip_path)
 
-                # No longer pass inferencer_obj to _perform_image_understanding
                 understanding_text = _perform_image_understanding(img_pil_rgb, prompt, show_thinking, do_sample_u, text_temperature_u, max_new_tokens_u)
                 
                 txt_filename = f"{img_filename_base}.txt"; txt_filepath = os.path.join(output_files_build_dir, txt_filename)
@@ -746,15 +744,15 @@ def process_understanding_ui(input_mode, single_img_pil, batch_file_objs, prompt
     
     yield "", "Invalid input mode.", None
 
-# --- Model Management Functions (Moved outside gr.Blocks) ---
+# --- Model Management Functions ---
 def list_available_models():
     """Scans the 'models/' directory and returns a list of subfolder names."""
     models_dir = "models"
     if not os.path.exists(models_dir):
-        os.makedirs(models_dir) # Create if it doesn't exist
+        os.makedirs(models_dir) 
         return []
     
-    # Filter for directories only
+
     available_models = [d for d in os.listdir(models_dir) if os.path.isdir(os.path.join(models_dir, d))]
     
     if not available_models:
@@ -764,7 +762,7 @@ def list_available_models():
 
 # --- Gradio UI Definition ---
 with gr.Blocks() as demo:
-    # No gr.State for inferencer needed here, it's global
+
     gr.Markdown("""<div> <img src="https://lf3-static.bytednsdoc.com/obj/eden-cn/nuhojubrps/banner.png" alt="BAGEL" width="380"/> </div>""")
     
     with gr.Tab("📝 Text to Image") as tab_t2i_obj:
@@ -874,14 +872,14 @@ with gr.Blocks() as demo:
     show_thinking_t2i.change(fn=lambda show: (gr.update(visible=show), gr.update(visible=show)), inputs=[show_thinking_t2i], outputs=[thinking_output_t2i, thinking_params_t2i_group])
     enable_xy_plot_t2i.change(fn=lambda enabled: (gr.update(visible=enabled), gr.update(visible=not enabled)), inputs=[enable_xy_plot_t2i], outputs=[xy_plot_output_t2i_img, img_output_t2i_gallery])
 
-    # Inputs list for gen_btn_t2i, REMOVED current_inferencer_state
+   
     gen_btn_t2i.click(fn=process_text_to_image_ui, inputs=[txt_input_t2i, show_thinking_t2i, cfg_text_scale_t2i, cfg_interval_t2i, timestep_shift_t2i, num_timesteps_t2i, cfg_renorm_min_t2i, cfg_renorm_type_t2i, max_think_token_n_t2i, do_sample_t2i, text_temperature_t2i, seed_t2i, image_ratio_t2i, batch_size_t2i, enable_xy_plot_t2i, xy_x_param_t2i, xy_x_values_t2i, xy_y_param_t2i, xy_y_values_t2i], outputs=[img_output_t2i_gallery, thinking_output_t2i, xy_plot_output_t2i_img])
 
     edit_show_thinking.change(fn=lambda show: (gr.update(visible=show), gr.update(visible=show)), inputs=[edit_show_thinking], outputs=[edit_thinking_output, edit_thinking_params_group])
     enable_task_breakdown.change(fn=lambda show: gr.update(visible=show), inputs=[enable_task_breakdown], outputs=[task_breakdown_params_accordion])
     enable_xy_plot_edit.change(fn=lambda enabled: (gr.update(visible=enabled), gr.update(visible=not enabled)), inputs=[enable_xy_plot_edit], outputs=[xy_plot_output_edit_img, edit_image_output_gallery]) 
 
-    # Inputs list for edit_btn, REMOVED current_inferencer_state
+   
     edit_btn.click(fn=process_edit_image_ui, inputs=[
         edit_image_input, edit_prompt, edit_show_thinking, enable_task_breakdown, 
         edit_cfg_text_scale, edit_cfg_img_scale, edit_cfg_interval, edit_timestep_shift, 
@@ -898,9 +896,9 @@ with gr.Blocks() as demo:
             label="Input Mode", 
             value="Single Image"
         )
-        with gr.Row(visible=True) as und_single_image_row: # Initially visible
+        with gr.Row(visible=True) as und_single_image_row:
             img_input_und = gr.Image(label="Input Image", value=load_example_image('test_images/meme.jpg'), type="pil")
-        with gr.Row(visible=False) as und_batch_files_row: # Initially hidden
+        with gr.Row(visible=False) as und_batch_files_row:
             batch_input_und = gr.Files(label="Upload Images or ZIP file", file_types=["image", ".png", ".jpg", ".jpeg", ".webp", ".zip"])
 
         with gr.Column():
@@ -921,36 +919,36 @@ with gr.Blocks() as demo:
         def toggle_und_input_mode(mode_selected):
             is_single_mode = (mode_selected == "Single Image")
             return (
-                gr.update(visible=is_single_mode),  # und_single_image_row
-                gr.update(visible=not is_single_mode), # und_batch_files_row
-                gr.update(visible=is_single_mode),  # txt_output_und
-                gr.update(visible=not is_single_mode, value=""), # batch_log_und
-                gr.update(visible=not is_single_mode, value=None)  # batch_output_und_zip
+                gr.update(visible=is_single_mode),
+                gr.update(visible=not is_single_mode), 
+                gr.update(visible=is_single_mode), 
+                gr.update(visible=not is_single_mode, value=""), 
+                gr.update(visible=not is_single_mode, value=None) 
             )
         und_input_type.change(fn=toggle_und_input_mode, inputs=[und_input_type], outputs=[und_single_image_row, und_batch_files_row, txt_output_und, batch_log_und, batch_output_und_zip])
         
-        # Inputs list for img_understand_btn, REMOVED current_inferencer_state
+
         img_understand_btn.click(fn=process_understanding_ui, inputs=[und_input_type, img_input_und, batch_input_und, understand_prompt, understand_show_thinking, understand_do_sample, understand_text_temperature, understand_max_new_tokens], outputs=[txt_output_und, batch_log_und, batch_output_und_zip])
 
-    # --- New Models Tab ---
+    # --- Models Tab ---
     with gr.Tab("⚙️ Models"):
-        # Get initial model list for the dropdown
+
         model_dropdown_choices = list_available_models() 
         
-        # Determine initial selection for the dropdown based on args.model_path
+
         initial_model_selection = None
         if os.path.basename(args.model_path) in model_dropdown_choices:
             initial_model_selection = os.path.basename(args.model_path)
         elif model_dropdown_choices:
-            initial_model_selection = model_dropdown_choices[0] # Fallback to first available model
+            initial_model_selection = model_dropdown_choices[0] 
         
-        # Map args.mode int to string for initial radio button value
+
         initial_mode_str_for_ui = {
             1: "No Quantization (bfloat16)",
             2: "4-bit Quantization",
             3: "8-bit Quantization",
             4: "DFloat11 Compressed"
-        }.get(args.mode, "No Quantization (bfloat16)") # Default to bfloat16
+        }.get(args.mode, "No Quantization (bfloat16)")
 
         with gr.Column():
             model_dropdown = gr.Dropdown(label="Select Model", choices=model_dropdown_choices, value=initial_model_selection, interactive=True)
@@ -963,22 +961,19 @@ with gr.Blocks() as demo:
                 interactive=True
             )
             load_model_btn = gr.Button("Load Selected Model", variant="primary")
-            # The value will be set by the initial load, and then updated by the process_load_model function
             model_status_textbox = gr.Textbox(label="Model Loading Status", interactive=False, lines=5, value="Loading initial model...")
 
 
-        # Event listeners for Model Tab
         refresh_models_btn.click(
             fn=list_available_models,
             inputs=[],
             outputs=model_dropdown
         )
 
-        # `process_load_model` now only returns a status string, not the inferencer object
         load_model_btn.click(
             fn=process_load_model,
             inputs=[model_dropdown, quant_mode_radio],
-            outputs=model_status_textbox # Only updates the textbox
+            outputs=model_status_textbox
         )
 
     gr.Markdown("""<div style="display: flex; justify-content: flex-start; flex-wrap: wrap; gap: 10px;"> <a href="https://bagel-ai.org/"><img src="https://img.shields.io/badge/BAGEL-Website-0A66C2?logo=safari&logoColor=white" alt="BAGEL Website"/></a> <a href="https://arxiv.org/abs/2505.14683"><img src="https://img.shields.io/badge/BAGEL-Paper-red?logo=arxiv&logoColor=red" alt="BAGEL Paper on arXiv"/></a> <a href="https://huggingface.co/ByteDance-Seed/BAGEL-7B-MoT"><img src="https://img.shields.io/badge/BAGEL-Hugging%20Face-orange?logo=huggingface&logoColor=yellow" alt="BAGEL on Hugging Face"/></a> <a href="https://demo.bagel-ai.org/"><img src="https://img.shields.io/badge/BAGEL-Demo-blue?logo=googleplay&logoColor=blue" alt="BAGEL Demo"/></a> <a href="https://discord.gg/Z836xxzy"><img src="https://img.shields.io/badge/BAGEL-Discord-5865F2?logo=discord&logoColor=purple" alt="BAGEL Discord"/></a> <a href="mailto:bagel@bytedance.com"><img src="https://img.shields.io/badge/BAGEL-Email-D14836?logo=gmail&logoColor=red" alt="BAGEL Email"/></a> </div>""")
@@ -1063,7 +1058,7 @@ def apply_localization(block):
         for child in component.children: process_component(child)
     process_component(block); return block
 
-# --- Initial Model Loading at Script Startup (outside Blocks context) ---
+# --- Initial Model Loading at Script Startup ---
 initial_models_list = list_available_models()
 initial_model_name_arg = os.path.basename(args.model_path)
 
@@ -1092,7 +1087,7 @@ if selected_initial_model_name:
     print(f"Initial model loading: {selected_initial_model_name} in {selected_initial_mode_str} mode...")
     initial_status_msg_global = process_load_model(selected_initial_model_name, selected_initial_mode_str)
     print(f"Initial model load status:\n{initial_status_msg_global}")
-    if inferencer is None: # Check if loading actually failed
+    if inferencer is None: 
          initial_status_msg_global += "\nModel failed to load at startup. Check console for errors."
 else:
     initial_status_msg_global = "No model found at startup. Please use the 'Models' tab to load one."
@@ -1100,13 +1095,12 @@ else:
 # --- End Initial Model Loading ---
 
 if __name__ == "__main__":
-    # Pass the initial status message to the UI element when it's created
+
     with demo:
         model_status_textbox.value = initial_status_msg_global 
-        # If you need to update dropdown or radio based on successful initial load,
-        # you could also return these values from process_load_model and update them here or via gr.update in a .load() event
 
-    demo.queue() # Enable queueing for better performance
+
+    demo.queue() 
     if args.zh: 
         demo = apply_localization(demo)
     demo.launch(server_name=args.server_name, server_port=args.server_port, share=args.share, inbrowser=True)
