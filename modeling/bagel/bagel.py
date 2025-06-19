@@ -10,6 +10,7 @@ from torch import nn
 from torch.nn.attention.flex_attention import create_block_mask
 from transformers.configuration_utils import PretrainedConfig
 from transformers.modeling_utils import PreTrainedModel
+import numpy as np
 
 from data.data_utils import (
     create_sparse_mask, 
@@ -673,14 +674,30 @@ class Bagel(PreTrainedModel):
         cfg_img_key_values_lens: Optional[torch.IntTensor] = None,
         cfg_img_packed_key_value_indexes: Optional[torch.LongTensor] = None,
         cfg_type: str = "parallel",
+        # TeaCache
+        enable_teacache: bool = False,
+        teacache_rel_l1_thresh: float = 0.6,
+        teacache_coefficients: List[float] = [4.98651651e+02, -2.83781631e+02, 5.58554382e+01, -3.82021401e+00, 2.64230861e-01],
+        teacache_warm_up_steps: int = 2,  # Force calculation for first N steps
     ):
         x_t = packed_init_noises
-
+        
         timesteps = torch.linspace(1, 0, num_timesteps, device=x_t.device)
         timesteps = timestep_shift * timesteps / (1 + (timestep_shift - 1) * timesteps)
         dts =  timesteps[:-1] - timesteps[1:]
         timesteps = timesteps[:-1]
 
+        # TeaCache initialization
+        teacache_cnt = 0
+        teacache_accumulated_rel_l1_distance = 0
+        teacache_previous_latent_input = None
+        teacache_previous_residual = None
+        teacache_skipped_steps = 0
+        
+        # Initialize polynomial rescaling function
+        if enable_teacache:
+            rescale_func = np.poly1d(teacache_coefficients)
+        
         for i, t in tqdm(enumerate(timesteps), total=len(timesteps)):
 
             timestep = torch.tensor([t] * x_t.shape[0], device=x_t.device)
@@ -690,37 +707,71 @@ class Bagel(PreTrainedModel):
             else:
                 cfg_text_scale_ = 1.0
                 cfg_img_scale_ = 1.0
-            v_t = self._forward_flow(
-                x_t=x_t,
-                timestep=timestep, 
-                packed_vae_token_indexes=packed_vae_token_indexes,
-                packed_vae_position_ids=packed_vae_position_ids,
-                packed_text_ids=packed_text_ids,
-                packed_text_indexes=packed_text_indexes,
-                packed_position_ids=packed_position_ids,
-                packed_indexes=packed_indexes,
-                packed_seqlens=packed_seqlens,
-                key_values_lens=key_values_lens,
-                past_key_values=past_key_values,
-                packed_key_value_indexes=packed_key_value_indexes,
-                cfg_renorm_min=cfg_renorm_min,
-                cfg_renorm_type=cfg_renorm_type,
-                # cfg_text
-                cfg_text_scale=cfg_text_scale_,
-                cfg_text_packed_position_ids=cfg_text_packed_position_ids,
-                cfg_text_packed_query_indexes=cfg_text_packed_query_indexes,
-                cfg_text_key_values_lens=cfg_text_key_values_lens,
-                cfg_text_past_key_values=cfg_text_past_key_values,
-                cfg_text_packed_key_value_indexes=cfg_text_packed_key_value_indexes,
-                # cfg_img
-                cfg_img_scale=cfg_img_scale_,
-                cfg_img_packed_position_ids=cfg_img_packed_position_ids,
-                cfg_img_packed_query_indexes=cfg_img_packed_query_indexes,
-                cfg_img_key_values_lens=cfg_img_key_values_lens,
-                cfg_img_past_key_values=cfg_img_past_key_values,
-                cfg_img_packed_key_value_indexes=cfg_img_packed_key_value_indexes,
-                cfg_type=cfg_type,
-            )
+
+            should_calc = True
+            if enable_teacache:
+                # Always calculate for first few steps (warm-up)
+                if teacache_cnt < teacache_warm_up_steps or teacache_cnt >= num_timesteps-1:
+                    should_calc = True
+                    teacache_accumulated_rel_l1_distance = 0
+                elif teacache_previous_latent_input is not None:
+                    # Calculate relative L1 distance
+                    rel_l1 = (x_t-teacache_previous_latent_input).abs().mean() / (teacache_previous_latent_input.abs().mean() + 1e-8)
+                    rel_l1_value = rel_l1.item()
+                    
+                    # Apply polynomial rescaling
+                    teacache_accumulated_rel_l1_distance += rescale_func(rel_l1_value)
+                    
+                    if teacache_accumulated_rel_l1_distance < teacache_rel_l1_thresh:
+                        should_calc = False
+                        teacache_skipped_steps += 1
+                    else:
+                        should_calc = True
+                        teacache_accumulated_rel_l1_distance = 0
+                
+                teacache_previous_latent_input = x_t.clone()
+                teacache_cnt += 1
+                if teacache_cnt >= num_timesteps:
+                    teacache_cnt = 0
+            
+            # Determine velocity - either calculate or reuse
+            if enable_teacache and not should_calc and teacache_previous_residual is not None:
+                # Skip calculation and reuse previous residual
+                v_t = teacache_previous_residual
+            else:
+                v_t = self._forward_flow(
+                    x_t=x_t,
+                    timestep=timestep, 
+                    packed_vae_token_indexes=packed_vae_token_indexes,
+                    packed_vae_position_ids=packed_vae_position_ids,
+                    packed_text_ids=packed_text_ids,
+                    packed_text_indexes=packed_text_indexes,
+                    packed_position_ids=packed_position_ids,
+                    packed_indexes=packed_indexes,
+                    packed_seqlens=packed_seqlens,
+                    key_values_lens=key_values_lens,
+                    past_key_values=past_key_values,
+                    packed_key_value_indexes=packed_key_value_indexes,
+                    cfg_renorm_min=cfg_renorm_min,
+                    cfg_renorm_type=cfg_renorm_type,
+                    # cfg_text
+                    cfg_text_scale=cfg_text_scale_,
+                    cfg_text_packed_position_ids=cfg_text_packed_position_ids,
+                    cfg_text_packed_query_indexes=cfg_text_packed_query_indexes,
+                    cfg_text_key_values_lens=cfg_text_key_values_lens,
+                    cfg_text_past_key_values=cfg_text_past_key_values,
+                    cfg_text_packed_key_value_indexes=cfg_text_packed_key_value_indexes,
+                    # cfg_img
+                    cfg_img_scale=cfg_img_scale_,
+                    cfg_img_packed_position_ids=cfg_img_packed_position_ids,
+                    cfg_img_packed_query_indexes=cfg_img_packed_query_indexes,
+                    cfg_img_key_values_lens=cfg_img_key_values_lens,
+                    cfg_img_past_key_values=cfg_img_past_key_values,
+                    cfg_img_packed_key_value_indexes=cfg_img_packed_key_value_indexes,
+                    cfg_type=cfg_type,
+                )
+                if enable_teacache:
+                    teacache_previous_residual = v_t.clone()
 
             x_t = x_t - v_t.to(x_t.device) * dts[i] # velocity pointing from data to noise
 

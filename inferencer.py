@@ -28,6 +28,12 @@ class InterleaveInferencer:
         self.vit_transform = vit_transform
         self.new_token_ids = new_token_ids
         
+        # TeaCache properties
+        self.enable_teacache = True
+        self.teacache_rel_l1_thresh = 0.6  # Configurable threshold: higher values mean more skipping but less accuracy
+        self.teacache_coefficients = [4.98651651e+02, -2.83781631e+02, 5.58554382e+01, -3.82021401e+00, 2.64230861e-01]
+        self.teacache_warm_up_steps = 2  # Force calculation for first N steps
+        
     def init_gen_context(self): 
         gen_context = {
             'kv_lens': [0],
@@ -154,6 +160,10 @@ class InterleaveInferencer:
             cfg_renorm_min=cfg_renorm_min,
             cfg_renorm_type=cfg_renorm_type,
             timestep_shift=timestep_shift,
+            enable_teacache=self.enable_teacache,
+            teacache_rel_l1_thresh=self.teacache_rel_l1_thresh,
+            teacache_coefficients=self.teacache_coefficients,
+            teacache_warm_up_steps=self.teacache_warm_up_steps,
             **generation_input,
             cfg_text_packed_position_ids=generation_input_cfg_text['cfg_packed_position_ids'],
             cfg_text_packed_query_indexes=generation_input_cfg_text['cfg_packed_query_indexes'],
