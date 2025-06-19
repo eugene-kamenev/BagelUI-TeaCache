@@ -54,8 +54,46 @@ This is a fork of the official BAGEL project's Gradio WebUI, incorporating sever
 
 Based on the original work by [Chaorui Deng* et al.](https://arxiv.org/abs/2505.14683)
 
+## Latest Update (June 19, 2025)
 
-## Latest Update (June 03, 2025)
+This update adds support for simple TeaCache implementation for Bagel inference pipeline.
+
+### TeaCache Bagel Implementation Test
+
+**Inference Parameters:**
+
+```yaml
+seed: 1234
+thinking: false
+cfg_text_scale: 4
+cfg_image_scale: 2
+cfg_interval: 0
+cfg_renorm_type: text_channel
+cfg_renorm_min: 0
+timesteps: 50
+timestep_shift: 3
+```
+
+**Prompt:**
+She boards a modern subway, quietly reading a folded newspaper, wearing the same clothes.
+
+| Setting           | Denoising Time | Skipped Steps | Result |
+|-------------------|----------------|---------------|--------|
+| TeaCache disabled | 00:51<00:00,  1.06it/s         |     0     | <img src="https://github.com/user-attachments/assets/efad65d7-829f-4a40-a1a3-f67068c7f4cf" width="137" height="175"> |
+| TeaCache (thrs=0.1, warmup_steps=2)      | 00:51<00:00,  1.06it/s         |     0     | <img src="https://github.com/user-attachments/assets/ec0fa727-88cd-481e-a34f-2783ba264359" width="137" height="175"> |
+| TeaCache (thrs=0.2, warmup_steps=2)      | 00:37<00:00,  1.29it/s         |     13     | <img src="https://github.com/user-attachments/assets/6e565f54-6abc-4b3c-81c3-ba517cd5fcca" width="137" height="175"> |
+| TeaCache (thrs=0.3, warmup_steps=2)      | 00:26<00:00,  1.86it/s         |     24     | <img src="https://github.com/user-attachments/assets/86f45f04-af6c-465a-a3ea-b0be2bb26f30" width="137" height="175"> |
+| TeaCache (thrs=0.4, warmup_steps=2)      | 00:22<00:00,  2.22it/s         |     28     | <img src="https://github.com/user-attachments/assets/7eb18d6e-8704-486f-bf93-7ed672a05ce6" width="137" height="175"> |
+| TeaCache (thrs=0.5, warmup_steps=2)      | 00:17<00:00,  2.74it/s         |     32     | <img src="https://github.com/user-attachments/assets/76d44f79-47eb-4285-a628-3039f55a9066" width="137" height="175"> |
+| TeaCache (thrs=0.6, warmup_steps=2)      | 00:15<00:00,  3.11it/s         |     34     |  <img src="https://github.com/user-attachments/assets/f03fc774-e8a1-4018-bbbc-e3a550722782" width="137" height="175"> |
+| TeaCache (thrs=0.7, warmup_steps=2)      | 00:13<00:00,  3.60it/s         |     36     | <img src="https://github.com/user-attachments/assets/f0104ce7-8dae-4f15-b358-85d900879302" width="137" height="175"> |
+| TeaCache (thrs=0.8, warmup_steps=2)      | 00:12<00:00,  3.90it/s         |     37     | <img src="https://github.com/user-attachments/assets/3750595d-906f-4854-bd25-ac3fe7df2a56" width="137" height="175"> |
+| TeaCache (thrs=0.9, warmup_steps=2)      | 00:11<00:00,  4.24it/s         |     38     | <img src="https://github.com/user-attachments/assets/7a9de052-6454-44ab-bb5f-93ce3a3e47af" width="137" height="175"> |
+| TeaCache (thrs=1.0, warmup_steps=2)      | 00:10<00:00,  4.67it/s         |     39     |  <img src="https://github.com/user-attachments/assets/25dc8c19-6ddd-43e1-aae2-ee3b56433c08" width="137" height="175"> |
+
+
+
+## Update (June 03, 2025)
 
 This update adds support for dfloat11 compressed BAGEL models and enhances model management, flexibility and inference speed within the BagelUI:
 
