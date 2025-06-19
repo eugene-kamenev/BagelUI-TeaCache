@@ -233,7 +233,7 @@ def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=
 
     # Configure TeaCache settings
     inferencer.enable_teacache = enable_teacache
-    inferencer.rel_l1_thresh = teacache_threshold
+    inferencer.teacache_rel_l1_thresh = teacache_threshold
     inferencer.teacache_warm_up_steps = teacache_warmup_steps
 
     with torch.inference_mode():
@@ -263,7 +263,7 @@ def edit_image(image: Image.Image, prompt: str, show_thinking=False, cfg_text_sc
 
     # Configure TeaCache settings
     inferencer.enable_teacache = enable_teacache
-    inferencer.rel_l1_thresh = teacache_threshold
+    inferencer.teacache_rel_l1_thresh = teacache_threshold
     inferencer.teacache_warm_up_steps = teacache_warmup_steps
 
     with torch.inference_mode():
