@@ -679,13 +679,18 @@ class Bagel(PreTrainedModel):
         teacache_rel_l1_thresh: float = 0.6,
         teacache_coefficients: List[float] = [4.98651651e+02, -2.83781631e+02, 5.58554382e+01, -3.82021401e+00, 2.64230861e-01],
         teacache_warm_up_steps: int = 2,  # Force calculation for first N steps
+        sampler="euler",
+        sampler_kwargs=None
     ):
         x_t = packed_init_noises
+        device = x_t.device
+        dtype = x_t.dtype
         
-        timesteps = torch.linspace(1, 0, num_timesteps, device=x_t.device)
-        timesteps = timestep_shift * timesteps / (1 + (timestep_shift - 1) * timesteps)
-        dts =  timesteps[:-1] - timesteps[1:]
-        timesteps = timesteps[:-1]
+        # Pre-compute timesteps and dts for efficiency
+        timesteps_all = torch.linspace(1, 0, num_timesteps, device=device, dtype=dtype)
+        timesteps_all = timestep_shift * timesteps_all / (1 + (timestep_shift - 1) * timesteps_all)
+        dts = timesteps_all[:-1] - timesteps_all[1:]
+        timesteps = timesteps_all[:-1]
 
         # TeaCache initialization
         teacache_cnt = 0
@@ -694,15 +699,33 @@ class Bagel(PreTrainedModel):
         teacache_previous_residual = None
         teacache_skipped_steps = 0
         
+        # Initialize sampler state with pre-allocated tensors for performance
+        sampler_kwargs = sampler_kwargs or {}
+        sampler_state = {
+            "v_prev": None,
+            "v_prev2": None,
+            "x_prev": None,
+            "model_outputs": [],
+            "timesteps_history": [],
+            "sigma_down": None,
+            "sigma_up": None,
+        }
+
         # Initialize polynomial rescaling function
         if enable_teacache:
             rescale_func = np.poly1d(teacache_coefficients)
         
+        # Pre-compute CFG interval check for performance
+        cfg_start, cfg_end = cfg_interval
+        
         # Add tqdm progress bar with dynamic description for skipped steps
-        with tqdm(total=len(timesteps)) as pbar:
+        with tqdm(total=len(timesteps), desc="Generating") as pbar:
             for i, t in enumerate(timesteps):
-                timestep = torch.tensor([t] * x_t.shape[0], device=x_t.device)
-                if t > cfg_interval[0] and t <= cfg_interval[1]:
+                # Pre-allocate timestep tensor for efficiency
+                timestep = t.expand(x_t.shape[0])
+                
+                # Optimized CFG scale calculation
+                if cfg_start < t <= cfg_end:
                     cfg_text_scale_ = cfg_text_scale
                     cfg_img_scale_ = cfg_img_scale
                 else:
@@ -716,8 +739,9 @@ class Bagel(PreTrainedModel):
                         should_calc = True
                         teacache_accumulated_rel_l1_distance = 0
                     elif teacache_previous_latent_input is not None:
-                        # Calculate relative L1 distance
-                        rel_l1 = (x_t-teacache_previous_latent_input).abs().mean() / (teacache_previous_latent_input.abs().mean() + 1e-8)
+                        # Optimized relative L1 distance calculation
+                        diff = x_t - teacache_previous_latent_input
+                        rel_l1 = diff.abs().mean() / (teacache_previous_latent_input.abs().mean() + 1e-8)
                         rel_l1_value = rel_l1.item()
                         
                         # Apply polynomial rescaling
@@ -772,16 +796,301 @@ class Bagel(PreTrainedModel):
                         cfg_type=cfg_type,
                     )
                     if enable_teacache:
+                        # Ensure the cached residual is on the same device
                         teacache_previous_residual = v_t.clone()
 
-                x_t = x_t - v_t.to(x_t.device) * dts[i] # velocity pointing from data to noise
+                # Update model outputs history for multistep methods (limit size for memory)
+                sampler_state["model_outputs"].append(v_t)
+                if len(sampler_state["model_outputs"]) > 4:
+                    sampler_state["model_outputs"].pop(0)
+                sampler_state["timesteps_history"].append(t)
+                if len(sampler_state["timesteps_history"]) > 4:
+                    sampler_state["timesteps_history"].pop(0)
+
+                # Get dt for current step
+                dt = dts[i]
+                
+                # Get previous x for samplers that need it
+                x_prev = sampler_state["x_prev"]
+                sampler_state["x_prev"] = x_t.clone()
+                
+                # Apply the selected sampler
+                if sampler == "euler":
+                    # Euler method (1st order)
+                    x_t = x_t - v_t * dt
+                
+                elif sampler == "euler_a" or sampler == "euler_ancestral":
+                    # Euler Ancestral (adds noise)
+                    sigma = sampler_kwargs.get("sigma", 1.0)
+                    noise_scale = sampler_kwargs.get("noise_scale", 1.0)
+                    
+                    # Add scaled noise based on timestep
+                    noise = torch.randn_like(x_t) * sigma * noise_scale * torch.sqrt(dt)
+                    x_t = x_t - v_t * dt + noise
+                
+                elif sampler == "heun":
+                    # Heun's method (2nd order Runge-Kutta)
+                    x_mid = x_t - v_t * dt
+                    
+                    # Second evaluation at the predicted point
+                    if i < len(timesteps) - 1:  # Skip second evaluation for last step
+                        next_t = timesteps[i+1]
+                        next_timestep = next_t.expand(x_t.shape[0])
+                        v_mid = self._forward_flow(
+                            x_t=x_mid,
+                            timestep=next_timestep,
+                            packed_vae_token_indexes=packed_vae_token_indexes,
+                            packed_vae_position_ids=packed_vae_position_ids,
+                            packed_text_ids=packed_text_ids,
+                            packed_text_indexes=packed_text_indexes,
+                            packed_position_ids=packed_position_ids,
+                            packed_indexes=packed_indexes,
+                            packed_seqlens=packed_seqlens,
+                            key_values_lens=key_values_lens,
+                            past_key_values=past_key_values,
+                            packed_key_value_indexes=packed_key_value_indexes,
+                            cfg_renorm_min=cfg_renorm_min,
+                            cfg_renorm_type=cfg_renorm_type,
+                            cfg_text_scale=cfg_text_scale_,
+                            cfg_text_packed_position_ids=cfg_text_packed_position_ids,
+                            cfg_text_packed_query_indexes=cfg_text_packed_query_indexes,
+                            cfg_text_key_values_lens=cfg_text_key_values_lens,
+                            cfg_text_past_key_values=cfg_text_past_key_values,
+                            cfg_text_packed_key_value_indexes=cfg_text_packed_key_value_indexes,
+                            cfg_img_scale=cfg_img_scale_,
+                            cfg_img_packed_position_ids=cfg_img_packed_position_ids,
+                            cfg_img_packed_query_indexes=cfg_img_packed_query_indexes,
+                            cfg_img_key_values_lens=cfg_img_key_values_lens,
+                            cfg_img_past_key_values=cfg_img_past_key_values,
+                            cfg_img_packed_key_value_indexes=cfg_img_packed_key_value_indexes,
+                            cfg_type=cfg_type,
+                        )
+                        x_t = x_t - (v_t + v_mid) * dt * 0.5
+                    else:
+                        # For last step, just use Euler
+                        x_t = x_mid
+                
+                elif sampler == "lms":
+                    # Linear Multistep method
+                    v_prev = sampler_state["v_prev"]
+                    
+                    if v_prev is None:
+                        # First step, use Euler
+                        x_t = x_t - v_t * dt
+                    else:
+                        # 2nd order LMS with optimized computation
+                        v_comb = v_t * 1.5 - v_prev * 0.5
+                        x_t = x_t - v_comb * dt
+                    
+                    sampler_state["v_prev"] = v_t.clone()
+                
+                elif sampler == "dpm2":
+                    # DPM-Solver-2 (Momentum)
+                    v_prev = sampler_state["v_prev"]
+                    
+                    if v_prev is None:
+                        # First step, use Euler
+                        x_t = x_t - v_t * dt
+                    else:
+                        # DPM-Solver-2M with optimized computation
+                        r = dts[i-1] / dt if i > 0 else 1.0
+                        D_i = v_t + (v_t - v_prev) / (2 * r)
+                        x_t = x_t - D_i * dt
+                    
+                    sampler_state["v_prev"] = v_t.clone()
+                
+                elif sampler == "dpm2_sde":
+                    # DPM-Solver++ 2M SDE
+                    v_prev = sampler_state["v_prev"]
+                    
+                    if v_prev is None:
+                        # First step, use Euler
+                        x_t = x_t - v_t * dt
+                    else:
+                        # Add noise term based on SDE formulation
+                        noise_scale = sampler_kwargs.get("noise_scale", 0.5)
+                        noise = torch.randn_like(x_t) * torch.sqrt(dt) * noise_scale
+                        
+                        # DPM-Solver++ 2M with noise
+                        r = dts[i-1] / dt if i > 0 else 1.0
+                        D_i = v_t + (v_t - v_prev) / (2 * r)
+                        x_t = x_t - D_i * dt + noise
+                    
+                    sampler_state["v_prev"] = v_t.clone()
+                
+                elif sampler == "dpmpp_2s":
+                    # DPM++ 2S Ancestral
+                    noise_scale = sampler_kwargs.get("noise_scale", 1.0)
+                    eta = sampler_kwargs.get("eta", 1.0)
+                    
+                    # Convert flow timestep to noise schedule
+                    sigma_t = t
+                    sigma_s = t - dt if i < len(timesteps) - 1 else 0
+                    
+                    # DPM++ 2S formula
+                    h = sigma_s - sigma_t
+                    if eta == 0:
+                        # Deterministic
+                        x_t = x_t - v_t * h
+                    else:
+                        # Ancestral sampling
+                        noise = torch.randn_like(x_t)
+                        sigma_up = min(sigma_s, eta * torch.sqrt(sigma_s**2 - sigma_t**2))
+                        sigma_down = torch.sqrt(sigma_s**2 - sigma_up**2)
+                        x_t = (sigma_down / sigma_t) * x_t - (sigma_down - sigma_t) * v_t + sigma_up * noise
+                
+                elif sampler == "dpmpp_3m":
+                    # DPM++ 3M (3rd order multistep)
+                    outputs = sampler_state["model_outputs"]
+                    timesteps_hist = sampler_state["timesteps_history"]
+                    
+                    if len(outputs) < 3:
+                        # Fall back to Euler for first steps
+                        x_t = x_t - v_t * dt
+                    else:
+                        # 3rd order multistep formula
+                        v_1, v_2, v_3 = outputs[-3:]
+                        h_1 = timesteps_hist[-2] - timesteps_hist[-1]
+                        h_2 = timesteps_hist[-3] - timesteps_hist[-2]
+                        
+                        r_1 = h_1 / h_2
+                        D_1 = v_1
+                        D_2 = (v_1 - v_2) / r_1
+                        D_3 = (D_2 - (v_2 - v_3) / (r_1 * (1 + r_1))) * (2 * r_1) / (1 + r_1)
+                        
+                        x_t = x_t - (D_1 + 0.5 * D_2 + (1/12) * D_3) * dt
+                
+                elif sampler == "ddim":
+                    # DDIM (Deterministic Diffusion Model)
+                    # Implementation based on https://arxiv.org/abs/2010.02502
+                    eta = sampler_kwargs.get("eta", 0.0)  # 0.0 means deterministic, 1.0 means full stochasticity
+                    
+                    # Predict x_0
+                    pred_x0 = x_t - v_t  # Simplified prediction (v_t points from x_0 to x_1)
+                    
+                    # Get alphas from timestep
+                    alpha_t = 1 - t
+                    alpha_s = 1 - (t - dt)
+                    
+                    # DDIM formula with optimized computation
+                    c1 = torch.sqrt(alpha_s)
+                    c2 = torch.sqrt(1 - alpha_s - eta**2 * (1 - alpha_s) * (1 - alpha_t) / (1 - alpha_t))
+                    
+                    # Add noise if eta > 0
+                    if eta > 0:
+                        noise = torch.randn_like(x_t)
+                        c3 = eta * torch.sqrt((1 - alpha_t) * (1 - alpha_s) / (1 - alpha_t))
+                        x_t = c1 * pred_x0 + c2 * v_t + c3 * noise
+                    else:
+                        x_t = c1 * pred_x0 + c2 * v_t
+                
+                elif sampler == "dpm3":
+                    # 3rd order DPM-Solver
+                    outputs = sampler_state["model_outputs"]
+                    timesteps_hist = sampler_state["timesteps_history"]
+                    
+                    if len(outputs) < 3:
+                        # Fall back to Euler for first two steps
+                        x_t = x_t - v_t * dt
+                    else:
+                        # 3rd order DPM-Solver combining previous steps
+                        # Implementation based on https://arxiv.org/abs/2206.00927
+                        t_1, t_2, t_3 = timesteps_hist[-3:]
+                        v_1, v_2, v_3 = outputs[-3:]
+                        
+                        h_1 = t_1 - t_2
+                        h_2 = t_2 - t_3
+                        r_1 = h_1 / h_2
+                        D_1 = (1 + 2 * r_1) / (r_1 * (r_1 + 1)) * v_1 - (1 + r_1) / (r_1 * (r_1 + 1)) * v_2 + 1 / (r_1 + 1) * v_3
+                        x_t = x_t - D_1 * dt
+                
+                elif sampler == "k_dpm_2_a":
+                    # k_dpm_2_ancestral from Karras et al.
+                    # Add noise scaled by timestep
+                    noise_scale = sampler_kwargs.get("noise_scale", 1.0)
+                    noise = torch.randn_like(x_t) * torch.sqrt(dt) * noise_scale * t
+
+                    if sampler_state["v_prev"] is None:
+                        # Use euler for first step
+                        x_t = x_t - v_t * dt + noise
+                    else:
+                        # Second order correction with noise
+                        v_prev = sampler_state["v_prev"]
+                        r = dts[i-1] / dt if i > 0 else 1.0
+                        D_i = v_t + (v_t - v_prev) / (2 * r)
+                        x_t = x_t - D_i * dt + noise
+                    
+                    sampler_state["v_prev"] = v_t.clone()
+                
+                elif sampler == "restart":
+                    # Restart sampling with periodic noise injection
+                    restart_interval = sampler_kwargs.get("restart_interval", 10)
+                    restart_strength = sampler_kwargs.get("restart_strength", 0.1)
+                    
+                    # Apply Euler step
+                    x_t = x_t - v_t * dt
+                    
+                    # Add restart noise at intervals
+                    if (i + 1) % restart_interval == 0 and i < len(timesteps) - 1:
+                        noise = torch.randn_like(x_t) * restart_strength * t
+                        x_t = x_t + noise
+                
+                elif sampler == "midpoint":
+                    # Midpoint method (2nd order)
+                    if i < len(timesteps) - 1:
+                        # Calculate midpoint
+                        x_mid = x_t - 0.5 * v_t * dt
+                        mid_t = (t + timesteps[i+1]) * 0.5
+                        mid_timestep = mid_t.expand(x_t.shape[0])
+                        
+                        # Evaluate at midpoint
+                        v_mid = self._forward_flow(
+                            x_t=x_mid,
+                            timestep=mid_timestep,
+                            packed_vae_token_indexes=packed_vae_token_indexes,
+                            packed_vae_position_ids=packed_vae_position_ids,
+                            packed_text_ids=packed_text_ids,
+                            packed_text_indexes=packed_text_indexes,
+                            packed_position_ids=packed_position_ids,
+                            packed_indexes=packed_indexes,
+                            packed_seqlens=packed_seqlens,
+                            key_values_lens=key_values_lens,
+                            past_key_values=past_key_values,
+                            packed_key_value_indexes=packed_key_value_indexes,
+                            cfg_renorm_min=cfg_renorm_min,
+                            cfg_renorm_type=cfg_renorm_type,
+                            cfg_text_scale=cfg_text_scale_,
+                            cfg_text_packed_position_ids=cfg_text_packed_position_ids,
+                            cfg_text_packed_query_indexes=cfg_text_packed_query_indexes,
+                            cfg_text_key_values_lens=cfg_text_key_values_lens,
+                            cfg_text_past_key_values=cfg_text_past_key_values,
+                            cfg_text_packed_key_value_indexes=cfg_text_packed_key_value_indexes,
+                            cfg_img_scale=cfg_img_scale_,
+                            cfg_img_packed_position_ids=cfg_img_packed_position_ids,
+                            cfg_img_packed_query_indexes=cfg_img_packed_query_indexes,
+                            cfg_img_key_values_lens=cfg_img_key_values_lens,
+                            cfg_img_past_key_values=cfg_img_past_key_values,
+                            cfg_img_packed_key_value_indexes=cfg_img_packed_key_value_indexes,
+                            cfg_type=cfg_type,
+                        )
+                        x_t = x_t - v_mid * dt
+                    else:
+                        # For last step, use Euler
+                        x_t = x_t - v_t * dt
+                
+                else:
+                    raise ValueError(f"Unknown sampler: {sampler}")
 
                 # Update tqdm description with skipped steps
                 if enable_teacache:
-                    pbar.set_description(f"Generating (TeaCache skipped: {teacache_skipped_steps})")
+                    pbar.set_description(f"Generating (TeaCache skipped: {teacache_skipped_steps}, Sampler: {sampler})")
+                else:
+                    pbar.set_description(f"Generating (Sampler: {sampler})")
                 pbar.update(1)
 
-        unpacked_latent = x_t.split((packed_seqlens - 2).tolist())
+        # Optimized unpacking using split with list comprehension
+        split_sizes = (packed_seqlens - 2).tolist()
+        unpacked_latent = x_t.split(split_sizes)
         return unpacked_latent
 
     @torch.no_grad
@@ -817,6 +1126,7 @@ class Bagel(PreTrainedModel):
         cfg_img_packed_key_value_indexes: Optional[torch.LongTensor] = None,
         cfg_type: str = "parallel",
     ):
+        device = x_t.device
         packed_text_embedding = self.language_model.model.embed_tokens(packed_text_ids)
         packed_sequence = packed_text_embedding.new_zeros((sum(packed_seqlens), self.hidden_size))
         packed_sequence[packed_text_indexes] = packed_text_embedding
@@ -824,10 +1134,10 @@ class Bagel(PreTrainedModel):
         assert timestep.unique().shape[0] == 1
         packed_pos_embed = self.latent_pos_embed(packed_vae_position_ids)
         packed_timestep_embeds = self.time_embedder(timestep)
-        x_t = self.vae2llm(x_t) + packed_timestep_embeds + packed_pos_embed
-        if x_t.dtype != packed_sequence.dtype:
-            x_t = x_t.to(packed_sequence.dtype)
-        packed_sequence[packed_vae_token_indexes] = x_t
+        x_t_embed = self.vae2llm(x_t) + packed_timestep_embeds + packed_pos_embed
+        if x_t_embed.dtype != packed_sequence.dtype:
+            x_t_embed = x_t_embed.to(packed_sequence.dtype)
+        packed_sequence[packed_vae_token_indexes] = x_t_embed
 
         extra_inputs = {}
         if self.use_moe:
@@ -918,7 +1228,8 @@ class Bagel(PreTrainedModel):
             # No CFG
             pass
 
-        return v_t
+        # Ensure v_t is on the same device as x_t for efficient computation
+        return v_t.to(device)
 
     def prepare_start_tokens(self, curr_kvlens, curr_rope, new_token_ids):
         packed_start_tokens, packed_key_value_indexes = list(), list()

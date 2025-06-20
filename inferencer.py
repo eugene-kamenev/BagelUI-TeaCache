@@ -116,7 +116,9 @@ class InterleaveInferencer:
         cfg_renorm_type="global",
         
         num_timesteps=50, 
-        timestep_shift=3.0
+        timestep_shift=3.0,
+        sampler="euler",
+        sampler_kwargs=None
     ):
         # print(cfg_renorm_type)
         past_key_values = gen_context['past_key_values']
@@ -164,6 +166,8 @@ class InterleaveInferencer:
             teacache_rel_l1_thresh=self.teacache_rel_l1_thresh,
             teacache_coefficients=self.teacache_coefficients,
             teacache_warm_up_steps=self.teacache_warm_up_steps,
+            sampler=sampler,
+            sampler_kwargs=sampler_kwargs,
             **generation_input,
             cfg_text_packed_position_ids=generation_input_cfg_text['cfg_packed_position_ids'],
             cfg_text_packed_query_indexes=generation_input_cfg_text['cfg_packed_query_indexes'],
@@ -230,6 +234,8 @@ class InterleaveInferencer:
         cfg_renorm_min=0.0,
         cfg_renorm_type="global",
         image_shapes=(1024, 1024),
+        sampler="euler",
+        sampler_kwargs=None,
     ) -> List[Union[str, Image.Image]]:
 
         output_list = []
@@ -285,6 +291,8 @@ class InterleaveInferencer:
                     num_timesteps=num_timesteps,
                     cfg_renorm_min=cfg_renorm_min,
                     cfg_renorm_type=cfg_renorm_type,
+                    sampler=sampler,
+                    sampler_kwargs=sampler_kwargs,
                 )
 
                 output_list.append(img)

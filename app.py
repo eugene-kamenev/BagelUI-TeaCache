@@ -217,7 +217,7 @@ def set_seed(seed):
     elif seed == 0: random.seed(None); np.random.seed(None); torch.manual_seed(random.randint(0, 2**32 -1)); torch.cuda.manual_seed_all(random.randint(0, 2**32 -1)) if torch.cuda.is_available() else None; torch.backends.cudnn.deterministic = False; torch.backends.cudnn.benchmark = True
     return seed
 
-def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=0.4, timestep_shift=3.0, num_timesteps=50, cfg_renorm_min=0.0, cfg_renorm_type="global", max_think_token_n=1024, do_sample=False, text_temperature=0.3, seed=0, image_ratio="1:1", save_to_dir=None, batch_index=0, is_xy_plot_image=False, xy_plot_filename_prefix="", enable_teacache=True, teacache_threshold=0.6, teacache_warmup_steps=2):
+def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=0.4, timestep_shift=3.0, num_timesteps=50, cfg_renorm_min=0.0, cfg_renorm_type="global", max_think_token_n=1024, do_sample=False, text_temperature=0.3, seed=0, image_ratio="1:1", save_to_dir=None, batch_index=0, is_xy_plot_image=False, xy_plot_filename_prefix="", enable_teacache=True, teacache_threshold=0.6, teacache_warmup_steps=2, sampler="euler"):
     global inferencer 
     if inferencer is None:
         raise gr.Error("No model loaded. Please load a model from the Models tab first.")
@@ -228,7 +228,7 @@ def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=
     elif image_ratio == "16:9": image_shapes = (576, 1024)
     elif image_ratio == "9:16": image_shapes = (1024, 576)
     else: image_shapes = (1024,1024)
-    inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type, image_shapes=image_shapes)
+    inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type, image_shapes=image_shapes, sampler=sampler)
     
 
     # Configure TeaCache settings
@@ -251,14 +251,14 @@ def text_to_image(prompt, show_thinking=False, cfg_text_scale=4.0, cfg_interval=
         except Exception as e: print(f"Error saving T2I image to {save_path}: {e}")
     return generated_image, result.get("text", None)
 
-def edit_image(image: Image.Image, prompt: str, show_thinking=False, cfg_text_scale=4.0, cfg_img_scale=2.0, cfg_interval=0.0, timestep_shift=3.0, num_timesteps=50, cfg_renorm_min=0.0, cfg_renorm_type="text_channel", max_think_token_n=1024, do_sample=False, text_temperature=0.3, seed=0, save_to_dir=None, batch_index=0, sub_step_idx=0, is_xy_plot_image=False, xy_plot_filename_prefix="", enable_teacache=True, teacache_threshold=0.6, teacache_warmup_steps=2):
+def edit_image(image: Image.Image, prompt: str, show_thinking=False, cfg_text_scale=4.0, cfg_img_scale=2.0, cfg_interval=0.0, timestep_shift=3.0, num_timesteps=50, cfg_renorm_min=0.0, cfg_renorm_type="text_channel", max_think_token_n=1024, do_sample=False, text_temperature=0.3, seed=0, save_to_dir=None, batch_index=0, sub_step_idx=0, is_xy_plot_image=False, xy_plot_filename_prefix="", enable_teacache=True, teacache_threshold=0.6, teacache_warmup_steps=2, sampler="euler"):
     global inferencer 
     if inferencer is None:
         raise gr.Error("No model loaded. Please load a model from the Models tab first.")
     current_seed_for_generation = seed; set_seed(current_seed_for_generation)
     if image is None: return "Please upload an image.", ""
     image_pil = Image.fromarray(image) if isinstance(image, np.ndarray) else image; image_pil = pil_img2rgb(image_pil)
-    inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_img_scale=cfg_img_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type)
+    inference_hyper = dict(max_think_token_n=max_think_token_n if show_thinking else 1024, do_sample=do_sample if show_thinking else False, text_temperature=text_temperature if show_thinking else 0.3, cfg_text_scale=cfg_text_scale, cfg_img_scale=cfg_img_scale, cfg_interval=[cfg_interval, 1.0], timestep_shift=timestep_shift, num_timesteps=num_timesteps, cfg_renorm_min=cfg_renorm_min, cfg_renorm_type=cfg_renorm_type, sampler=sampler)
     
 
     # Configure TeaCache settings
@@ -447,7 +447,7 @@ def assemble_xy_plot_image(images_matrix_flat, x_param_name, x_values, y_param_n
     return grid_image
 
 # --- UI Callback Functions ---
-def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed_main, image_ratio_main, batch_size_main, enable_xy, xy_x_param_name, xy_x_values_str, xy_y_param_name, xy_y_values_str, enable_teacache_main, teacache_threshold_main, teacache_warmup_steps_main):
+def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed_main, image_ratio_main, batch_size_main, enable_xy, xy_x_param_name, xy_x_values_str, xy_y_param_name, xy_y_values_str, enable_teacache_main, teacache_threshold_main, teacache_warmup_steps_main, sampler_main):
     global current_tab; current_tab = "t2i" 
     xy_plot_run_save_dir = None 
 
@@ -457,7 +457,7 @@ def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_mai
         for i in range(int(batch_size_main)):
             current_iteration_seed = base_seed + i if base_seed > 0 else random.randint(1, 2**32 -1)
 
-            image_result, thinking_result = text_to_image(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed=current_iteration_seed, image_ratio=image_ratio_main, save_to_dir=txt2img_save_dir, batch_index=i, enable_teacache=enable_teacache_main, teacache_threshold=teacache_threshold_main, teacache_warmup_steps=teacache_warmup_steps_main)
+            image_result, thinking_result = text_to_image(prompt_main, show_thinking_main, cfg_text_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, max_think_token_n_main, do_sample_main, text_temperature_main, seed=current_iteration_seed, image_ratio=image_ratio_main, save_to_dir=txt2img_save_dir, batch_index=i, enable_teacache=enable_teacache_main, teacache_threshold=teacache_threshold_main, teacache_warmup_steps=teacache_warmup_steps_main, sampler=sampler_main)
             if image_result: all_images.append(image_result)
             if thinking_result: all_thinking_texts.append(f"Batch {i+1} (Seed: {current_iteration_seed}) Thinking:\n{thinking_result}")
         return all_images, "\n\n".join(all_thinking_texts) if all_thinking_texts else "", gr.update(visible=False)
@@ -485,7 +485,7 @@ def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_mai
         parts = [p.strip() for p in xy_y_values_str.split(',')]
         if parts: y_sr_search_term = parts[0]
 
-    default_params = {"prompt": prompt_main, "show_thinking": False, "cfg_text_scale": cfg_text_scale_main, "cfg_interval": cfg_interval_main, "num_timesteps": num_timesteps_main, "timestep_shift": timestep_shift_main, "cfg_renorm_min": cfg_renorm_min_main, "cfg_renorm_type": cfg_renorm_type_main, "max_think_token_n": max_think_token_n_main, "do_sample": do_sample_main, "text_temperature": text_temperature_main, "seed": int(seed_main), "image_ratio": image_ratio_main, "is_xy_plot_image": True, "save_to_dir": xy_plot_run_save_dir, "enable_teacache": enable_teacache_main, "teacache_threshold": teacache_threshold_main, "teacache_warmup_steps": teacache_warmup_steps_main}
+    default_params = {"prompt": prompt_main, "show_thinking": False, "cfg_text_scale": cfg_text_scale_main, "cfg_interval": cfg_interval_main, "num_timesteps": num_timesteps_main, "timestep_shift": timestep_shift_main, "cfg_renorm_min": cfg_renorm_min_main, "cfg_renorm_type": cfg_renorm_type_main, "max_think_token_n": max_think_token_n_main, "do_sample": do_sample_main, "text_temperature": text_temperature_main, "seed": int(seed_main), "image_ratio": image_ratio_main, "is_xy_plot_image": True, "save_to_dir": xy_plot_run_save_dir, "enable_teacache": enable_teacache_main, "teacache_threshold": teacache_threshold_main, "teacache_warmup_steps": teacache_warmup_steps_main, "sampler": sampler_main}
     
     x_axis_values = x_vals if x_param_info else [None]; y_axis_values = y_vals if y_param_info else [None]
     first_image_for_size = None
@@ -546,7 +546,7 @@ def process_text_to_image_ui(prompt_main, show_thinking_main, cfg_text_scale_mai
         return [], "X/Y Plot Generated. Individual cell images saved in subfolder.", gr.update(value=final_grid_image, visible=True)
     else: return [], "Failed to assemble X/Y plot image.", gr.update(value=None, visible=True)
 
-def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_main, enable_breakdown_main, cfg_text_scale_main, cfg_img_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, edit_do_sample_main, edit_max_think_tokens_main, edit_temp_main, seed_main, batch_size_main, decompose_num_s_main, decompose_sample_main, decompose_max_t_main, decompose_temp_main, enable_xy_e, xy_x_param_e_name, xy_x_values_str_e, xy_y_param_e_name, xy_y_values_str_e, enable_teacache_main, teacache_threshold_main, teacache_warmup_steps_main):
+def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_main, enable_breakdown_main, cfg_text_scale_main, cfg_img_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, edit_do_sample_main, edit_max_think_tokens_main, edit_temp_main, seed_main, batch_size_main, decompose_num_s_main, decompose_sample_main, decompose_max_t_main, decompose_temp_main, enable_xy_e, xy_x_param_e_name, xy_x_values_str_e, xy_y_param_e_name, xy_y_values_str_e, enable_teacache_main, teacache_threshold_main, teacache_warmup_steps_main, sampler_main):
     global current_tab; current_tab = "edit"
     xy_plot_run_save_dir_edit = None
 
@@ -570,7 +570,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
             for step_num, sub_prompt_text in enumerate(active_prompts_for_this_run):
                 thinking_for_this_batch_run.append(f"Processing Sub-step {step_num+1}/{len(active_prompts_for_this_run)}: '{sub_prompt_text}'"); print(f"Batch {batch_idx+1}, Seed {current_batch_item_seed}, Sub-step {step_num+1}: '{sub_prompt_text}'")
 
-                edited_sub_step_image_pil, thinking_text_from_sub_step = edit_image(current_image_being_processed, sub_prompt_text, show_thinking_main, cfg_text_scale_main, cfg_img_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, edit_max_think_tokens_main, edit_do_sample_main, edit_temp_main, seed=current_batch_item_seed, save_to_dir=current_run_save_dir, batch_index=batch_idx, sub_step_idx=step_num, enable_teacache=enable_teacache_main, teacache_threshold=teacache_threshold_main, teacache_warmup_steps=teacache_warmup_steps_main)
+                edited_sub_step_image_pil, thinking_text_from_sub_step = edit_image(current_image_being_processed, sub_prompt_text, show_thinking_main, cfg_text_scale_main, cfg_img_scale_main, cfg_interval_main, timestep_shift_main, num_timesteps_main, cfg_renorm_min_main, cfg_renorm_type_main, edit_max_think_tokens_main, edit_do_sample_main, edit_temp_main, seed=current_batch_item_seed, save_to_dir=current_run_save_dir, batch_index=batch_idx, sub_step_idx=step_num, enable_teacache=enable_teacache_main, teacache_threshold=teacache_threshold_main, teacache_warmup_steps=teacache_warmup_steps_main, sampler=sampler_main)
                 if edited_sub_step_image_pil and isinstance(edited_sub_step_image_pil, Image.Image): current_image_being_processed = edited_sub_step_image_pil; thinking_for_this_batch_run.append(f" Sub-step {step_num+1} Thinking: {thinking_text_from_sub_step}") if show_thinking_main and thinking_text_from_sub_step else None
                 else: error_msg = f" Sub-step {step_num+1} FAILED. {edited_sub_step_image_pil if isinstance(edited_sub_step_image_pil, str ) else 'No valid image.'}"; thinking_for_this_batch_run.append(error_msg); print(error_msg); break
             all_final_images_for_gallery.append(current_image_being_processed); all_batch_thinking_texts_accumulated.append("\n".join(thinking_for_this_batch_run))
@@ -593,7 +593,7 @@ def process_edit_image_ui(image_input_pil, user_main_prompt_main, show_thinking_
     if y_param_info_e and xy_y_param_e_name == "Prompt S/R" and xy_y_values_str_e:
         y_prompt_sr_search_term_e = xy_y_values_str_e.split(',')[0].strip()
 
-    default_params_edit = {"image": image_input_pil, "prompt": user_main_prompt_main, "show_thinking": False, "cfg_text_scale": cfg_text_scale_main, "cfg_img_scale": cfg_img_scale_main, "cfg_interval": cfg_interval_main, "num_timesteps": num_timesteps_main, "timestep_shift": timestep_shift_main, "cfg_renorm_min": cfg_renorm_min_main, "cfg_renorm_type": cfg_renorm_type_main, "max_think_token_n": edit_max_think_tokens_main, "do_sample": edit_do_sample_main, "text_temperature": edit_temp_main, "seed": int(seed_main), "is_xy_plot_image": True, "save_to_dir": xy_plot_run_save_dir_edit, "enable_teacache": enable_teacache_main, "teacache_threshold": teacache_threshold_main, "teacache_warmup_steps": teacache_warmup_steps_main}
+    default_params_edit = {"image": image_input_pil, "prompt": user_main_prompt_main, "show_thinking": False, "cfg_text_scale": cfg_text_scale_main, "cfg_img_scale": cfg_img_scale_main, "cfg_interval": cfg_interval_main, "num_timesteps": num_timesteps_main, "timestep_shift": timestep_shift_main, "cfg_renorm_min": cfg_renorm_min_main, "cfg_renorm_type": cfg_renorm_type_main, "max_think_token_n": edit_max_think_tokens_main, "do_sample": edit_do_sample_main, "text_temperature": edit_temp_main, "seed": int(seed_main), "is_xy_plot_image": True, "save_to_dir": xy_plot_run_save_dir_edit, "enable_teacache": enable_teacache_main, "teacache_threshold": teacache_threshold_main, "teacache_warmup_steps": teacache_warmup_steps_main, "sampler": sampler_main}
     x_axis_values_e = x_vals_e if x_param_info_e else [None]; y_axis_values_e = y_vals_e if y_param_info_e else [None]
     first_image_for_size_edit = None
 
@@ -809,6 +809,28 @@ with gr.Blocks() as demo:
                 with gr.Row():
                     teacache_warmup_steps_t2i = gr.Slider(minimum=0, maximum=10, value=2, step=1, interactive=True, label="TeaCache Warmup Steps", 
                                                         info="Number of initial steps to always calculate before applying TeaCache optimizations")
+                with gr.Row():
+                    # Add sampler dropdown to the UI
+                    sampler_t2i = gr.Dropdown(
+                        choices=[
+                            ("Euler (Fast, Basic Quality)", "euler"),
+                            ("Euler Ancestral", "euler_a"),
+                            ("Heun (Better Quality)", "heun"),
+                            ("DDIM (Deterministic Diffusion Model)", "ddim"),
+                            ("DPM-Solver-2 (High Quality)", "dpm2"),
+                            ("DPM++ 2S Ancestral", "dpmpp_2s"),
+                            ("DPM++ 3M (3rd order multistep)", "dpmpp_3m"),
+                            ("DPM-Solver++ 2M SDE (High Quality)", "dpm2_sde"),
+                            ("DPM-Solver 3rd order", "dpm3"),
+                            ("k_dpm_2_ancestral from Karras et al.", "k_dpm_2_a"),
+                            ("Midpoint method (2nd order)", "midpoint"),
+                            ("Linear Multistep", "lms"),
+                            ("Restart", "restart"),
+                        ],
+                        value="euler",
+                        label="Sampling Method",
+                        info="Different samplers offer trade-offs between speed and quality"
+                    )
             thinking_params_t2i_group = gr.Group(visible=False)
             with thinking_params_t2i_group:
                 with gr.Row(): 
@@ -862,6 +884,27 @@ with gr.Blocks() as demo:
                 with gr.Row():
                     teacache_warmup_steps_edit = gr.Slider(minimum=0, maximum=10, value=2, step=1, interactive=True, label="TeaCache Warmup Steps", 
                                                          info="Number of initial steps to always calculate before applying TeaCache optimizations")
+                with gr.Row():
+                    sampler_edit = gr.Dropdown(
+                            choices=[
+                                ("Euler (Fast, Basic Quality)", "euler"),
+                                ("Euler Ancestral", "euler_a"),
+                                ("Heun (Better Quality)", "heun"),
+                                ("DDIM (Deterministic Diffusion Model)", "ddim"),
+                                ("DPM-Solver-2 (High Quality)", "dpm2"),
+                                ("DPM++ 2S Ancestral", "dpmpp_2s"),
+                                ("DPM++ 3M (3rd order multistep)", "dpmpp_3m"),
+                                ("DPM-Solver++ 2M SDE (High Quality)", "dpm2_sde"),
+                                ("DPM-Solver 3rd order", "dpm3"),
+                                ("k_dpm_2_ancestral from Karras et al.", "k_dpm_2_a"),
+                                ("Midpoint method (2nd order)", "midpoint"),
+                                ("Linear Multistep", "lms"),
+                                ("Restart", "restart"),
+                            ],
+                            value="euler",
+                            label="Sampling Method",
+                            info="Different samplers offer trade-offs between speed and quality"
+                        )
                 with gr.Accordion("LLM Task Breakdown Parameters", open=False, visible=False) as task_breakdown_params_accordion:
                     gr.Markdown("These parameters control the LLM when it breaks down your prompt.")
                     decompose_num_steps = gr.Slider(minimum=1, maximum=3, value=3, step=1, interactive=True, label="Number of Sub-steps", info="How many steps the LLM should try to generate.")
@@ -894,6 +937,7 @@ with gr.Blocks() as demo:
         "Prompt S/R": {"var": "prompt_sr", "type": str, "t2i_slider": None, "edit_slider": None},
         "CFG Image Scale": {"var": "cfg_img_scale", "type": float, "t2i_slider": None, "edit_slider": edit_cfg_img_scale},
         "TeaCache Warmup": {"var": "teacache_warmup_steps", "type": int, "t2i_slider": teacache_warmup_steps_t2i, "edit_slider": teacache_warmup_steps_edit},
+        "Sampler": {"var": "sampler", "type": str, "t2i_slider": sampler_t2i, "edit_slider": sampler_edit},
     })
 
     xy_plot_choices_t2i_list = [(k, k) for k in XY_PLOT_PARAM_MAPPING.keys() if XY_PLOT_PARAM_MAPPING[k]["t2i_slider"] is not None or k == "Prompt S/R"]
@@ -908,7 +952,7 @@ with gr.Blocks() as demo:
     enable_xy_plot_t2i.change(fn=lambda enabled: (gr.update(visible=enabled), gr.update(visible=not enabled)), inputs=[enable_xy_plot_t2i], outputs=[xy_plot_output_t2i_img, img_output_t2i_gallery])
 
    
-    gen_btn_t2i.click(fn=process_text_to_image_ui, inputs=[txt_input_t2i, show_thinking_t2i, cfg_text_scale_t2i, cfg_interval_t2i, timestep_shift_t2i, num_timesteps_t2i, cfg_renorm_min_t2i, cfg_renorm_type_t2i, max_think_token_n_t2i, do_sample_t2i, text_temperature_t2i, seed_t2i, image_ratio_t2i, batch_size_t2i, enable_xy_plot_t2i, xy_x_param_t2i, xy_x_values_t2i, xy_y_param_t2i, xy_y_values_t2i, enable_teacache_t2i, teacache_threshold_t2i, teacache_warmup_steps_t2i], outputs=[img_output_t2i_gallery, thinking_output_t2i, xy_plot_output_t2i_img])
+    gen_btn_t2i.click(fn=process_text_to_image_ui, inputs=[txt_input_t2i, show_thinking_t2i, cfg_text_scale_t2i, cfg_interval_t2i, timestep_shift_t2i, num_timesteps_t2i, cfg_renorm_min_t2i, cfg_renorm_type_t2i, max_think_token_n_t2i, do_sample_t2i, text_temperature_t2i, seed_t2i, image_ratio_t2i, batch_size_t2i, enable_xy_plot_t2i, xy_x_param_t2i, xy_x_values_t2i, xy_y_param_t2i, xy_y_values_t2i, enable_teacache_t2i, teacache_threshold_t2i, teacache_warmup_steps_t2i, sampler_t2i], outputs=[img_output_t2i_gallery, thinking_output_t2i, xy_plot_output_t2i_img])
 
     edit_show_thinking.change(fn=lambda show: (gr.update(visible=show), gr.update(visible=show)), inputs=[edit_show_thinking], outputs=[edit_thinking_output, edit_thinking_params_group])
     enable_task_breakdown.change(fn=lambda show: gr.update(visible=show), inputs=[enable_task_breakdown], outputs=[task_breakdown_params_accordion])
@@ -922,7 +966,7 @@ with gr.Blocks() as demo:
         edit_do_sample_img, edit_max_think_token_n_img, edit_text_temperature_img, 
         edit_seed, edit_batch_size, decompose_num_steps, decompose_do_sample, decompose_max_tokens, decompose_temperature,
         enable_xy_plot_edit, xy_x_param_edit, xy_x_values_edit, xy_y_param_edit, xy_y_values_edit,
-        enable_teacache_edit, teacache_threshold_edit, teacache_warmup_steps_edit  # Added warmup steps parameter
+        enable_teacache_edit, teacache_threshold_edit, teacache_warmup_steps_edit, sampler_edit
 ], outputs=[edit_image_output_gallery, edit_thinking_output, xy_plot_output_edit_img])
 
     with gr.Tab("🖼️ Image Understanding") as tab_und_obj:
