@@ -684,23 +684,25 @@ class Bagel(PreTrainedModel):
         
         timesteps = torch.linspace(1, 0, num_timesteps, device=x_t.device)
         timesteps = timestep_shift * timesteps / (1 + (timestep_shift - 1) * timesteps)
-        dts =  timesteps[:-1] - timesteps[1:]
+        dts = timesteps[:-1] - timesteps[1:]
         timesteps = timesteps[:-1]
 
         # TeaCache initialization
-        teacache_cnt = 0
-        teacache_accumulated_rel_l1_distance = 0
-        teacache_previous_latent_input = None
-        teacache_previous_residual = None
+        current_step = 0
+        accumulated_rel_l1_distance = 0
+        previous_latent_input = None
+        previous_residual = None
         teacache_skipped_steps = 0
         
         # Initialize polynomial rescaling function
         if enable_teacache:
             rescale_func = np.poly1d(teacache_coefficients)
         
-        for i, t in tqdm(enumerate(timesteps), total=len(timesteps)):
-
+        progress = tqdm(enumerate(timesteps), total=len(timesteps))
+        for i, t in progress:
             timestep = torch.tensor([t] * x_t.shape[0], device=x_t.device)
+            
+            # Determine CFG scale based on timestep interval
             if t > cfg_interval[0] and t <= cfg_interval[1]:
                 cfg_text_scale_ = cfg_text_scale
                 cfg_img_scale_ = cfg_img_scale
@@ -710,34 +712,33 @@ class Bagel(PreTrainedModel):
 
             should_calc = True
             if enable_teacache:
-                # Always calculate for first few steps (warm-up)
-                if teacache_cnt < teacache_warm_up_steps or teacache_cnt >= num_timesteps-1:
+                # Always calculate for first few steps and last step
+                if current_step < teacache_warm_up_steps or current_step == num_timesteps-1:
                     should_calc = True
-                    teacache_accumulated_rel_l1_distance = 0
-                elif teacache_previous_latent_input is not None:
+                    accumulated_rel_l1_distance = 0
+                elif previous_latent_input is not None:
                     # Calculate relative L1 distance
-                    rel_l1 = (x_t-teacache_previous_latent_input).abs().mean() / (teacache_previous_latent_input.abs().mean() + 1e-8)
+                    rel_l1 = (x_t-previous_latent_input).abs().mean() / (previous_latent_input.abs().mean() + 1e-8)
                     rel_l1_value = rel_l1.item()
                     
                     # Apply polynomial rescaling
-                    teacache_accumulated_rel_l1_distance += rescale_func(rel_l1_value)
+                    accumulated_rel_l1_distance += rescale_func(rel_l1_value)
                     
-                    if teacache_accumulated_rel_l1_distance < teacache_rel_l1_thresh:
+                    # Determine if calculation can be skipped
+                    if accumulated_rel_l1_distance < teacache_rel_l1_thresh:
                         should_calc = False
                         teacache_skipped_steps += 1
                     else:
                         should_calc = True
-                        teacache_accumulated_rel_l1_distance = 0
+                        accumulated_rel_l1_distance = 0
                 
-                teacache_previous_latent_input = x_t.clone()
-                teacache_cnt += 1
-                if teacache_cnt >= num_timesteps:
-                    teacache_cnt = 0
+                previous_latent_input = x_t.clone()
+                current_step += 1
             
             # Determine velocity - either calculate or reuse
-            if enable_teacache and not should_calc and teacache_previous_residual is not None:
+            if enable_teacache and not should_calc and previous_residual is not None:
                 # Skip calculation and reuse previous residual
-                v_t = teacache_previous_residual
+                v_t = previous_residual
             else:
                 v_t = self._forward_flow(
                     x_t=x_t,
@@ -771,8 +772,8 @@ class Bagel(PreTrainedModel):
                     cfg_type=cfg_type,
                 )
                 if enable_teacache:
-                    teacache_previous_residual = v_t.clone()
-
+                    previous_residual = v_t
+            progress.set_description(f"Step {i+1}/{num_timesteps}, TeaCache Skipped: {teacache_skipped_steps}")
             x_t = x_t - v_t * dts[i] # velocity pointing from data to noise
 
         unpacked_latent = x_t.split((packed_seqlens - 2).tolist())
