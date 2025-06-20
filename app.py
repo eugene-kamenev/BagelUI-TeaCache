@@ -11,7 +11,7 @@ import tempfile
 import shutil 
 from PIL import UnidentifiedImageError
 import gc
-from accelerate import infer_auto_device_map, dispatch_model, init_empty_weights 
+from accelerate import infer_auto_device_map, dispatch_model, init_empty_weights, load_checkpoint_and_dispatch
 from dfloat11 import DFloat11Model
 
 from data.data_utils import add_special_tokens, pil_img2rgb
