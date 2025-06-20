@@ -773,7 +773,7 @@ class Bagel(PreTrainedModel):
                 if enable_teacache:
                     teacache_previous_residual = v_t.clone()
 
-            x_t = x_t - v_t.to(x_t.device) * dts[i] # velocity pointing from data to noise
+            x_t = x_t - v_t * dts[i] # velocity pointing from data to noise
 
         unpacked_latent = x_t.split((packed_seqlens - 2).tolist())
         return unpacked_latent
@@ -811,6 +811,7 @@ class Bagel(PreTrainedModel):
         cfg_img_packed_key_value_indexes: Optional[torch.LongTensor] = None,
         cfg_type: str = "parallel",
     ):
+        device = x_t.device
         packed_text_embedding = self.language_model.model.embed_tokens(packed_text_ids)
         packed_sequence = packed_text_embedding.new_zeros((sum(packed_seqlens), self.hidden_size))
         packed_sequence[packed_text_indexes] = packed_text_embedding
@@ -901,7 +902,7 @@ class Bagel(PreTrainedModel):
                 if cfg_renorm_type == "global":
                     norm_v_t = torch.norm(v_t)
                     norm_v_t_ = torch.norm(v_t_)
-                elif cfg_renorm_type == "channel":
+                elif cfg_renorm_type == "local":
                     norm_v_t = torch.norm(v_t, dim=-1, keepdim=True)
                     norm_v_t_ = torch.norm(v_t_, dim=-1, keepdim=True)
                 else:
@@ -912,7 +913,7 @@ class Bagel(PreTrainedModel):
             # No CFG
             pass
 
-        return v_t
+        return v_t.to(device)
 
     def prepare_start_tokens(self, curr_kvlens, curr_rope, new_token_ids):
         packed_start_tokens, packed_key_value_indexes = list(), list()
