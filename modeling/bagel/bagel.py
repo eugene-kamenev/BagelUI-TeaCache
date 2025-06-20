@@ -688,7 +688,6 @@ class Bagel(PreTrainedModel):
         timesteps = timesteps[:-1]
 
         # TeaCache initialization
-        current_step = 0
         accumulated_rel_l1_distance = 0
         previous_latent_input = None
         previous_residual = None
@@ -700,8 +699,7 @@ class Bagel(PreTrainedModel):
         
         progress = tqdm(enumerate(timesteps), total=len(timesteps))
         for i, t in progress:
-            timestep = torch.tensor([t] * x_t.shape[0], device=x_t.device)
-            
+            current_step = i + 1
             # Determine CFG scale based on timestep interval
             if t > cfg_interval[0] and t <= cfg_interval[1]:
                 cfg_text_scale_ = cfg_text_scale
@@ -732,14 +730,14 @@ class Bagel(PreTrainedModel):
                         should_calc = True
                         accumulated_rel_l1_distance = 0
                 
-                previous_latent_input = x_t.clone()
-                current_step += 1
+                previous_latent_input = x_t
             
             # Determine velocity - either calculate or reuse
             if enable_teacache and not should_calc and previous_residual is not None:
                 # Skip calculation and reuse previous residual
                 v_t = previous_residual
             else:
+                timestep = torch.tensor([t] * x_t.shape[0], device=x_t.device)
                 v_t = self._forward_flow(
                     x_t=x_t,
                     timestep=timestep, 
