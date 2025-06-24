@@ -26,6 +26,27 @@ from modeling.bagel import (
 from modeling.qwen2 import Qwen2Tokenizer
 from accelerate.utils import BnbQuantizationConfig, load_and_quantize_model
 import argparse
+import sys, logging
+
+
+# Ensure stdout is unbuffered for real-time logging
+sys.stdout = open(sys.stdout.fileno(), 'w', buffering=1)
+
+class FlushStreamHandler(logging.StreamHandler):
+    def emit(self, record):
+        super().emit(record)
+        self.flush()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        FlushStreamHandler(sys.stdout),
+    ],
+    force=True  # Overwrite any previous logging config
+)
+logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--server_name", type=str, default="127.0.0.1")
@@ -97,7 +118,7 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
     if new_token_ids is not None:
         del new_token_ids; new_token_ids = None
     if inferencer is not None:
-        del inferencer; inferencer = None 
+        del inferencer; inferencer = None
     
     cleanup_memory()
     status_message += "Attempted to unload previous model and components.\n"
@@ -119,6 +140,17 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
             local_vae_model, vae_config = load_ae(local_path=vae_path_root)
         else:
             raise FileNotFoundError(f"VAE model (ae.safetensors) not found in '{current_model_dir}/vae/' or '{current_model_dir}/'")
+        
+        # disable sampling in VAE model
+        local_vae_model.reg.sample = False
+        local_vae_model.to(torch.cuda.current_device() if torch.cuda.is_available() else "cpu").eval()
+        try:
+            print("Attempting to compile vae model with torch.compile()...")
+            local_vae_model = torch.compile(local_vae_model, mode="reduce-overhead")
+            status_message += "Vae model compiled with torch.compile()\n"
+        except Exception as e_compile:
+            status_message += f"Warning: torch.compile() for vae model failed: {e_compile}\n"
+            print(f"Warning: torch.compile() for vae model failed: {e_compile}")
 
         config = BagelConfig(visual_gen=True, visual_und=True, llm_config=llm_config, vit_config=vit_config, vae_config=vae_config, vit_max_num_patch_per_side=70, connector_act='gelu_pytorch_tanh', latent_patch_size=2, max_latent_size=64)
 
@@ -127,7 +159,6 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
             vit_model_instance = SiglipVisionModel(vit_config)
             local_model = Bagel(language_model_instance, vit_model_instance, config)
             local_model.vit_model.vision_model.embeddings.convert_conv2d_to_linear(vit_config, meta=True)
-
         _same_device_modules = [
             'language_model.model.embed_tokens', 'time_embedder', 'latent_pos_embed',
             'vae2llm', 'llm2vae', 'connector', 'vit_pos_embed'

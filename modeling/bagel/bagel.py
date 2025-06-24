@@ -22,6 +22,7 @@ from .modeling_utils import MLPconnector, TimestepEmbedder, PositionEmbedding
 
 from tqdm import tqdm
 from modeling.cache.tea_cache import TeaCache
+from modeling.timing import time_logger
 
 
 class BagelConfig(PretrainedConfig):
@@ -296,6 +297,7 @@ class Bagel(PreTrainedModel):
 
         return past_key_values
 
+    @time_logger
     def prepare_vit_images(self, curr_kvlens, curr_rope, images, transforms, new_token_ids):
         packed_vit_token_indexes = list()
         vit_token_seqlens, packed_vit_tokens, packed_vit_position_ids = list(), list(), list()
@@ -359,6 +361,7 @@ class Bagel(PreTrainedModel):
         return generation_input, newlens, new_rope
 
     @torch.no_grad
+    @time_logger
     def forward_cache_update_vit(
         self,
         past_key_values: NaiveCache,
@@ -414,6 +417,7 @@ class Bagel(PreTrainedModel):
 
         return past_key_values
 
+    @time_logger
     def prepare_vae_images(self, curr_kvlens, curr_rope, images, transforms, new_token_ids, timestep=0):
         patchified_vae_latent_shapes, packed_vae_position_ids = list(), list()
         packed_vae_token_indexes = list()
@@ -488,6 +492,7 @@ class Bagel(PreTrainedModel):
         return generation_input, newlens, new_rope
 
     @torch.no_grad
+    @time_logger
     def forward_cache_update_vae(
         self,
         vae_model,
@@ -549,6 +554,7 @@ class Bagel(PreTrainedModel):
 
         return past_key_values
 
+    @time_logger
     def prepare_vae_latent(self, curr_kvlens, curr_rope, image_sizes, new_token_ids):
         packed_text_ids, packed_text_indexes = list(), list()
         packed_vae_position_ids, packed_vae_token_indexes, packed_init_noises = list(), list(), list()
@@ -607,6 +613,7 @@ class Bagel(PreTrainedModel):
 
         return generation_input
 
+    @time_logger
     def prepare_vae_latent_cfg(self, curr_kvlens, curr_rope, image_sizes):
         packed_position_ids, packed_indexes, packed_key_value_indexes = list(), list(), list()
 
@@ -641,6 +648,7 @@ class Bagel(PreTrainedModel):
         return generation_input
 
     @torch.no_grad
+    @time_logger
     def generate_image(
         self,
         packed_text_ids: torch.LongTensor,
@@ -681,7 +689,7 @@ class Bagel(PreTrainedModel):
         teacache_warm_up_steps: int = 2,  # Force calculation for first N steps
     ):
         x_t = packed_init_noises
-        
+
         timesteps = torch.linspace(1, 0, num_timesteps, device=x_t.device)
         timesteps = timestep_shift * timesteps / (1 + (timestep_shift - 1) * timesteps)
         dts = timesteps[:-1] - timesteps[1:]
@@ -749,7 +757,8 @@ class Bagel(PreTrainedModel):
         unpacked_latent = x_t.split((packed_seqlens - 2).tolist())
         return unpacked_latent
 
-    @torch.no_grad
+    @torch.no_grad()
+    @time_logger
     def _forward_flow(
         self,
         x_t: torch.Tensor,
@@ -784,6 +793,7 @@ class Bagel(PreTrainedModel):
         **kwargs
     ):
         device = x_t.device
+        dtype = x_t.dtype
         packed_text_embedding = self.language_model.model.embed_tokens(packed_text_ids)
         packed_sequence = packed_text_embedding.new_zeros((sum(packed_seqlens), self.hidden_size))
         packed_sequence[packed_text_indexes] = packed_text_embedding
@@ -864,7 +874,7 @@ class Bagel(PreTrainedModel):
                     v_t = v_t_text
             else:
                 v_t_text_ = cfg_text_v_t + cfg_text_scale * (v_t - cfg_text_v_t)
-                
+
                 if cfg_img_scale > 1.0:
                     v_t_ = cfg_img_v_t + cfg_img_scale * (v_t_text_ - cfg_img_v_t)
                 else:
@@ -885,7 +895,7 @@ class Bagel(PreTrainedModel):
             # No CFG
             pass
 
-        return v_t.to(device)
+        return v_t.to(device=device, dtype=dtype)
 
     def prepare_start_tokens(self, curr_kvlens, curr_rope, new_token_ids):
         packed_start_tokens, packed_key_value_indexes = list(), list()
