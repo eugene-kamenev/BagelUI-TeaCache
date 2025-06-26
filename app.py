@@ -17,6 +17,7 @@ from dfloat11 import DFloat11Model
 from data.data_utils import add_special_tokens, pil_img2rgb
 from data.transforms import ImageTransform
 from inferencer import InterleaveInferencer
+from inferencer import cleanup_memory
 from modeling.autoencoder import load_ae
 from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.bagel import (
@@ -73,13 +74,6 @@ model_path_global = None
 
 vae_transform = ImageTransform(1024, 512, 16)
 vit_transform = ImageTransform(980, 224, 14)
-
-def cleanup_memory():
-    """Centralized memory cleanup"""
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-        torch.cuda.synchronize()
 
 def process_load_model(selected_model_name: str, selected_mode_str: str):
     global model, vae_model, tokenizer, new_token_ids, inferencer, model_path_global

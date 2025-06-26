@@ -10,7 +10,7 @@ import torch
 from data.data_utils import pil_img2rgb
 from modeling.bagel.qwen2_navit import NaiveCache
 from modeling.timing import time_logger
-
+import gc
 
 
 VLM_THINK_SYSTEM_PROMPT = '''You should first think about the reasoning process in the mind and then provide the user with the answer. 
@@ -19,6 +19,12 @@ The reasoning process is enclosed within <think> </think> tags, i.e. <think> rea
 GEN_THINK_SYSTEM_PROMPT = '''You should first think about the planning process in the mind and then generate the image. 
 The planning process is enclosed within <think> </think> tags, i.e. <think> planning process here </think> image here'''
 
+def cleanup_memory():
+    """Centralized memory cleanup"""
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
 
 class InterleaveInferencer:
     def __init__(self, model, vae_model, tokenizer, vae_transform, vit_transform, new_token_ids):
@@ -185,7 +191,7 @@ class InterleaveInferencer:
             if isinstance(val, torch.Tensor):
                 generation_input_cfg_img[key] = val.to(self.device)
 
-        unpacked_latent = self.model.generate_image(
+        return self.model.generate_image(
             past_key_values=past_key_values,
             cfg_text_past_key_values=cfg_text_past_key_values,
             cfg_img_past_key_values=cfg_img_past_key_values,
@@ -210,9 +216,6 @@ class InterleaveInferencer:
             cfg_img_key_values_lens=generation_input_cfg_img['cfg_key_values_lens'],
             cfg_img_packed_key_value_indexes=generation_input_cfg_img['cfg_packed_key_value_indexes'],
         )
-
-        image = self.decode_image(unpacked_latent[0], image_shape)
-        return image
 
     @time_logger
     def decode_image(self, latent, image_shape):
@@ -334,8 +337,12 @@ class InterleaveInferencer:
                     cfg_renorm_min=cfg_renorm_min,
                     cfg_renorm_type=cfg_renorm_type,
                 )
-
-                output_list.append(img)
+                del gen_context
+                del cfg_text_context
+                del cfg_img_context
+                
+                cleanup_memory()
+                output_list.append(self.decode_image(img[0], image_shapes))
 
         return output_list
     
