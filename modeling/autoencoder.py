@@ -282,7 +282,10 @@ class DiagonalGaussian(nn.Module):
         mean, logvar = torch.chunk(z, 2, dim=self.chunk_dim)
         if self.sample:
             std = torch.exp(0.5 * logvar)
-            return mean + std * torch.randn_like(mean)
+            # due to some numerical issues, have to change this to make work encoder/decoder produce same results when VAE is on GPU
+            # needs more debugging, but right now this seems to work
+            eps = torch.randn(mean.shape, device='cpu', dtype=mean.dtype).to(mean.device)
+            return mean + std * eps
         else:
             return mean
 
@@ -312,12 +315,14 @@ class AutoEncoder(nn.Module):
         self.scale_factor = params.scale_factor
         self.shift_factor = params.shift_factor
 
-    def encode(self, x: Tensor) -> Tensor:
-        z = self.reg(self.encoder(x))
+    def encode(self, x: Tensor, rands: None) -> Tensor:
+        x = x.to(device=self.encoder.conv_in.weight.device, dtype=self.encoder.conv_in.weight.dtype)
+        z = self.reg(self.encoder(x), rands=rands)
         z = self.scale_factor * (z - self.shift_factor)
         return z
 
     def decode(self, z: Tensor) -> Tensor:
+        z = z.to(device=self.decoder.conv_in.weight.device, dtype=self.decoder.conv_in.weight.dtype)
         z = z / self.scale_factor + self.shift_factor
         return self.decoder(z)
 

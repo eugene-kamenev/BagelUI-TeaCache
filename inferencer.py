@@ -85,10 +85,6 @@ class InterleaveInferencer:
         kv_lens = gen_context['kv_lens']
         ropes =  gen_context['ropes']
 
-        # Ensure image is on the correct device if it's a tensor
-        if isinstance(image, torch.Tensor):
-            image = image.to(self.device)
-
         if vae:
             ## update vae
             generation_input, kv_lens, ropes = self.model.prepare_vae_images(
@@ -98,11 +94,6 @@ class InterleaveInferencer:
                 transforms=self.vae_transform, 
                 new_token_ids=self.new_token_ids,
             )
-            # Move any tensor inputs to the device
-            for key, val in generation_input.items():
-                if isinstance(val, torch.Tensor):
-                    generation_input[key] = val.to(self.device)
-                    
             past_key_values = self.model.forward_cache_update_vae(self.vae_model, past_key_values, **generation_input)
         
         if vit:
@@ -114,11 +105,6 @@ class InterleaveInferencer:
                 transforms=self.vit_transform, 
                 new_token_ids=self.new_token_ids,
             )
-            # Move any tensor inputs to the device
-            for key, val in generation_input.items():
-                if isinstance(val, torch.Tensor):
-                    generation_input[key] = val.to(self.device)
-                    
             past_key_values = self.model.forward_cache_update_vit(past_key_values, **generation_input)
 
         gen_context['kv_lens'] = kv_lens
@@ -155,12 +141,7 @@ class InterleaveInferencer:
             image_sizes=[image_shape], 
             new_token_ids=self.new_token_ids,
         )
-        
-        # Move any tensor inputs to the device
-        for key, val in generation_input.items():
-            if isinstance(val, torch.Tensor):
-                generation_input[key] = val.to(self.device)
-        
+
         # text cfg
         cfg_text_past_key_values = cfg_text_precontext['past_key_values']
         kv_lens_cfg = cfg_text_precontext['kv_lens']
@@ -170,11 +151,6 @@ class InterleaveInferencer:
             curr_rope=ropes_cfg, 
             image_sizes=[image_shape], 
         )
-        
-        # Move any cfg tensor inputs to the device
-        for key, val in generation_input_cfg_text.items():
-            if isinstance(val, torch.Tensor):
-                generation_input_cfg_text[key] = val.to(self.device)
 
         # img cfg
         cfg_img_past_key_values = cfg_img_precontext['past_key_values']
@@ -186,11 +162,6 @@ class InterleaveInferencer:
             image_sizes=[image_shape], 
         )
         
-        # Move any cfg tensor inputs to the device
-        for key, val in generation_input_cfg_img.items():
-            if isinstance(val, torch.Tensor):
-                generation_input_cfg_img[key] = val.to(self.device)
-
         return self.model.generate_image(
             past_key_values=past_key_values,
             cfg_text_past_key_values=cfg_text_past_key_values,
@@ -221,9 +192,6 @@ class InterleaveInferencer:
     def decode_image(self, latent, image_shape):
         H, W = image_shape
         h, w = H // self.model.latent_downsample, W // self.model.latent_downsample
-        
-        # Ensure latent is on the correct device
-        latent = latent.to(self.device)
 
         latent = latent.reshape(1, h, w, self.model.latent_patch_size, self.model.latent_patch_size, self.model.latent_channel)
         latent = torch.einsum("nhwpqc->nchpwq", latent)
@@ -242,12 +210,6 @@ class InterleaveInferencer:
         ropes = gen_context['ropes']
 
         generation_input = self.model.prepare_start_tokens(kv_lens, ropes, self.new_token_ids)
-        
-        # Move any tensor inputs to the device
-        for key, val in generation_input.items():
-            if isinstance(val, torch.Tensor):
-                generation_input[key] = val.to(self.device)
-                
         unpacked_latent = self.model.generate_text(
             past_key_values=past_key_values,
             max_length=max_length,
@@ -302,9 +264,6 @@ class InterleaveInferencer:
 
                 elif isinstance(input_term, Image.Image):
                     input_term = self.vae_transform.resize_transform(pil_img2rgb(input_term))
-                    # Convert to tensor and move to device if needed
-                    if isinstance(input_term, torch.Tensor):
-                        input_term = input_term.to(self.device)
                     gen_context = self.update_context_image(input_term, gen_context, vae=not understanding_output)
 
                     image_shapes = input_term.size[::-1]

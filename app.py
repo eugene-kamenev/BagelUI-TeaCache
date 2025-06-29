@@ -134,9 +134,7 @@ def process_load_model(selected_model_name: str, selected_mode_str: str):
             local_vae_model, vae_config = load_ae(local_path=vae_path_root)
         else:
             raise FileNotFoundError(f"VAE model (ae.safetensors) not found in '{current_model_dir}/vae/' or '{current_model_dir}/'")
-        
-        # disable sampling in VAE model
-        local_vae_model.reg.sample = False
+
         local_vae_model.to(torch.cuda.current_device() if torch.cuda.is_available() else "cpu").eval()
         try:
             print("Attempting to compile vae model with torch.compile()...")
